@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<title>Hyper Task Log · Prototype by Satya</title>
+<meta name="description" content="A clickable product concept for Hyper's task log: see what the agent did, what needs you, and act on it in place. The agent is simulated; the screens and interactions are designed to be real.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta name="theme-color" content="#201E1A">
+<!-- Link previews (LinkedIn, Slack, X). These need the full public address of the page. -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Hyper Task Log · Prototype by Satya">
+<meta property="og:description" content="A clickable product concept for Hyper's task log: see what the agent did, what needs you, and act on it in place. Agent simulated.">
+<meta property="og:url" content="https://ofsatya.github.io/hyper-task-log/">
+<meta property="og:image" content="https://ofsatya.github.io/hyper-task-log/assets/preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Hyper task log: a list of tasks marked Needs you, Waiting or Done.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: chat app shell. Fixed left sidebar whose top row switches between Home, Task log and
+   Settings (the active one expands into a labelled pill); main pane shows the home composer,
+   a chat thread, the embedded task log or a settings page. Single warm-dark look by design. */
+:root {
+  --bg: #201E1A;
+  --side: #1B1A16;
+  --pill: #393530;
+  --hover: #2C2A25;
+  --field: #262420;
+  --line: #36342F;
+  --line-2: #4D4C44;
+  --fg: #ECE9E3;
+  --muted: #9B9994;
+  --faint: #7E7D77;
+  --red: #FF0000;
+  --red-line: #CB1211;
+  --red-btn: #A02200;
+  --blue: #54B5FF;
+  --ok: #8FCB8B;
+  --f: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--f); font-size: 15px; overflow: hidden; }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+svg { flex: none; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.app { display: grid; grid-template-columns: 232px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); height: 100%; transition: grid-template-columns .2s ease; }
+.app.collapsed { grid-template-columns: 0 minmax(0, 1fr); }
+
+/* ---------- Sidebar ---------- */
+aside { background: var(--side); overflow: hidden auto; display: flex; flex-direction: column; gap: 22px; padding: calc(32px + env(safe-area-inset-top, 0px)) 10px 16px max(8px, env(safe-area-inset-left, 0px)); min-width: 0; }
+.app.collapsed > aside { visibility: hidden; }
+.nav-top { display: flex; align-items: center; gap: 4px; }
+.nav-btn {
+  height: 34px; min-width: 36px; display: flex; align-items: center; justify-content: center; gap: 10px;
+  border-radius: 999px; color: var(--fg); padding: 0 8px; transition: background .15s, flex-grow .2s ease;
+  flex: 0 0 auto; overflow: hidden; white-space: nowrap;
+}
+.nav-btn:hover { background: var(--hover); }
+.nav-btn .lbl { display: none; font-size: 15px; font-weight: 500; }
+.nav-btn.active { background: var(--pill); flex: 1 1 auto; justify-content: flex-start; padding: 0 14px 0 12px; }
+.nav-btn.active .lbl { display: inline; }
+.icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; color: var(--fg); transition: background .15s; }
+.icon:hover { background: var(--hover); }
+.icon:disabled { color: var(--faint); cursor: default; background: none; }
+
+.sec { display: flex; flex-direction: column; gap: 2px; }
+.sec-h { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 6px 4px; font-size: 13px; color: var(--muted); font-weight: 500; }
+.sec-h > span { display: flex; align-items: center; gap: 8px; }
+.sec-h .tools { display: flex; gap: 2px; }
+.sec-h .icon { width: 26px; height: 26px; border-radius: 7px; color: var(--muted); }
+.sec-h .icon:hover { color: var(--fg); }
+.chat-search { margin: 0 4px 6px; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; }
+.chat-search input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-size: 13px; }
+.item { border-radius: 8px; transition: background .15s; padding: 2px 0; }
+.item-main { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; column-gap: 10px; padding: 4px 6px 0; width: 100%; text-align: left; }
+.item > .sub { margin: 0 6px 4px; padding: 1px 6px 1px 0; border-radius: 6px; }
+.item > button.sub { cursor: pointer; }
+.item > button.sub:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+.item:hover { background: var(--hover); }
+.item.active { background: var(--pill); }
+.item .nm { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .tm { font-size: 12.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.item .sub { font-size: 12px; color: var(--faint); display: inline-flex; align-items: center; gap: 5px; }
+.status-item { display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 8px; width: 100%; font-size: 14px; font-weight: 500; text-align: left; transition: background .15s; }
+.status-item:hover { background: var(--hover); }
+.status-item.active { background: var(--pill); }
+.status-item .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.status-item .n { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.draft { margin-top: 10px; background: var(--bg); border: 1px solid var(--line-2); border-radius: 12px; overflow: hidden; white-space: normal; max-width: 620px; }
+.draft dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.draft dt { color: var(--muted); } .draft dd { margin: 0; overflow-wrap: anywhere; }
+.draft .body { padding: 12px 14px; white-space: pre-wrap; font-size: 14px; line-height: 1.55; }
+.draft input, .draft textarea { width: 100%; background: var(--field); border: 1px solid var(--line-2); border-radius: 8px; padding: 6px 8px; font-size: 13.5px; outline: none; }
+.draft textarea { min-height: 150px; resize: vertical; line-height: 1.5; font-size: 14px; }
+.draft .edit-body { padding: 12px 14px; }
+.draft-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 14px 12px; border-top: 1px solid var(--line); }
+.btn-red { height: 34px; padding: 0 14px; border-radius: 10px; background: var(--red-btn); color: #fff; font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
+.btn-red:hover { filter: brightness(1.12); }
+.btn-ghost { height: 34px; padding: 0 14px; border: 1px solid var(--line-2); border-radius: 10px; font-size: 14px; font-weight: 600; }
+.btn-ghost:hover { background: var(--hover); }
+.draft-status { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.draft-status.sent { color: var(--fg); } .draft-status.sent svg { color: var(--red-line); }
+.draft-status button { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-2); }
+.draft.discarded { opacity: .55; }
+.created { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 12px; border: 1px dashed var(--line-2); border-radius: 12px; font-size: 13.5px; white-space: normal; max-width: 620px; }
+.created .what { display: inline-flex; align-items: center; gap: 8px; flex: 1 1 220px; min-width: 0; }
+.created .what svg { color: var(--red-line); }
+.created .what b { font-weight: 600; overflow-wrap: anywhere; }
+.created input { flex: 1 1 220px; min-width: 0; height: 32px; background: var(--field); border: 1px solid var(--line-2); border-radius: 8px; padding: 0 10px; outline: none; }
+.created.rejected { color: var(--muted); }
+.tr-btn { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; transition: color .15s, border-color .15s, background .15s; }
+.tr-btn:hover { color: var(--fg); border-color: var(--line-2); background: var(--hover); }
+#side-transcript { cursor: pointer; }
+.tr-overlay { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px 16px; }
+.tr-scrim { position: absolute; inset: 0; background: rgba(8, 7, 6, .6); }
+.tr-panel { position: relative; width: min(720px, 100%); max-height: min(82vh, 820px); display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--field); border: 1px solid var(--line-2); border-radius: 16px; box-shadow: 0 30px 80px rgba(0,0,0,.55); animation: tr-in .2s ease both; }
+@keyframes tr-in { from { opacity: 0; transform: translateY(8px); } }
+.tr-head { display: flex; align-items: center; gap: 8px; padding: 14px 12px 14px 20px; border-bottom: 1px solid var(--line); }
+.tr-t { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.tr-t b { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-t span { font-size: 12.5px; color: var(--muted); }
+.tr-copy { height: 30px; padding: 0 12px; border: 1px solid var(--line-2); border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.tr-copy:hover { background: var(--hover); }
+.tr-body { list-style: none; margin: 0; padding: 8px 20px 20px; overflow: auto; }
+.tr-body li { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 4px 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.tr-body li:last-child { border-bottom: 0; }
+.tr-who { font-size: 12.5px; font-weight: 700; color: var(--fg); padding-top: 1px; }
+.tr-who.ai { color: var(--red-line); }
+.tr-when { display: block; font-weight: 500; color: var(--faint); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tr-text { font-size: 14px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tr-extra { margin-top: 6px; padding: 8px 10px; border-left: 2px solid var(--line-2); font-size: 13px; color: var(--muted); white-space: pre-wrap; }
+.proto-tag { display: inline-flex; align-items: center; gap: 6px; height: 28px; margin-left: 8px; padding: 0 11px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--muted); white-space: nowrap; transition: color .15s, background .15s; }
+.proto-tag:hover { color: var(--fg); background: var(--hover); }
+.tr-panel.about { width: min(760px, 100%); }
+.about-body { overflow: auto; padding: 6px 22px 22px; font-size: 14.5px; line-height: 1.6; }
+.about-body section { padding: 16px 0; border-bottom: 1px solid var(--line); }
+.about-body section:last-child { border-bottom: 0; }
+.about-body h3 { margin: 0 0 8px; font-size: 15px; font-weight: 700; }
+.about-body h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.about-body p { margin: 0 0 8px; } .about-body p:last-child { margin-bottom: 0; }
+.about-body ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.about-body li::marker { color: var(--faint); }
+.about-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.about-links { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.about-links a { color: var(--fg); font-weight: 600; text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+.about-links a:hover { text-decoration-color: var(--red-line); }
+.about-reset { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.about-reset b { display: block; font-weight: 600; }
+.about-reset span { display: block; font-size: 13.5px; color: var(--muted); }
+.attach-menu { position: fixed; z-index: 60; min-width: 180px; padding: 6px; background: var(--field); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: 0 14px 34px rgba(0,0,0,.5); display: grid; }
+.attach-menu button { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; font-size: 14px; font-weight: 500; text-align: left; }
+.attach-menu button:hover { background: var(--hover); }
+.picker { margin-top: 10px; max-width: 620px; background: var(--bg); border: 1px solid var(--line-2); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; white-space: normal; }
+.picker-h { margin: 0; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.picker-list { display: grid; gap: 2px; }
+.pick { display: flex; align-items: center; gap: 10px; padding: 7px 6px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.pick:hover { background: var(--hover); }
+.pick.static { cursor: default; } .pick.static:hover { background: none; } .pick.static svg { color: var(--red-line); }
+.pick input { accent-color: var(--red-btn); width: 16px; height: 16px; }
+.pick span { flex: 1; min-width: 0; }
+.pick em { font-style: normal; font-size: 12px; color: var(--muted); }
+.upload { display: inline-flex; align-items: center; justify-self: start; height: 32px; padding: 0 12px; border: 1px dashed var(--line-2); border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.upload:hover { background: var(--hover); }
+.upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.empty-side { font-size: 13px; color: var(--faint); padding: 4px 6px; }
+
+.set-nav .sec-h { padding-bottom: 4px; }
+.set-item { display: flex; align-items: center; gap: 12px; height: 30px; padding: 0 8px; border-radius: 999px; width: 100%; font-size: 15px; text-align: left; color: var(--fg); transition: background .15s; }
+.set-item:hover { background: var(--hover); }
+.set-item.active { background: var(--pill); }
+.set-item svg { color: var(--fg); }
+
+/* ---------- Main ---------- */
+.main { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; height: 100%; }
+.topbar { display: flex; align-items: center; gap: 2px; padding: calc(8px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 0 16px; min-height: 50px; }
+.topbar .spacer { flex: 1; }
+.topbar .where { font-size: 15px; font-weight: 500; margin-left: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.view { min-height: 0; overflow: auto; }
+
+/* Home */
+.home { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 46px; padding: 24px 24px 12vh; }
+.logo { display: flex; align-items: center; gap: 14px; color: var(--red); }
+.logo .word { font-weight: 500; font-size: 62px; letter-spacing: .01em; line-height: 1; transform: translateY(-4px); }
+.suggest { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: -24px; max-width: 560px; }
+.suggest button { border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--muted); }
+.suggest button:hover { color: var(--fg); border-color: var(--line-2); }
+
+/* Composer */
+.composer { width: min(520px, 100%); display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 10px; border: 1.5px solid var(--red-line); border-radius: 999px; background: var(--field); }
+.composer input { flex: 1; min-width: 0; height: 30px; border: 0; background: transparent; outline: none; font-size: 15px; caret-color: var(--red); padding-left: 4px; }
+.composer input::placeholder { color: var(--muted); }
+.composer .icon { width: 30px; height: 30px; border-radius: 999px; }
+.dd { position: relative; }
+.dd > button { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border-radius: 8px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.dd > button:hover { background: var(--hover); }
+.menu { position: absolute; right: 0; bottom: calc(100% + 10px); z-index: 10; min-width: 200px; background: var(--field); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: 0 14px 34px rgba(0,0,0,.5); }
+.menu.down { bottom: auto; top: calc(100% + 8px); }
+.menu button { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; font-size: 14px; text-align: left; white-space: nowrap; }
+.menu button:hover { background: var(--hover); }
+.menu button svg { opacity: 0; color: var(--red-line); }
+.menu button[aria-checked="true"] svg { opacity: 1; }
+.send { width: 30px; height: 30px; border-radius: 999px; background: var(--red-btn); color: #fff; display: grid; place-items: center; transition: filter .15s, opacity .15s; }
+.send:hover { filter: brightness(1.12); }
+.send:disabled { opacity: .55; cursor: default; filter: none; }
+
+/* Chat thread */
+.thread { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.chat-tasks { padding: 4px 24px 10px; }
+.chat-tasks-in { max-width: 720px; margin: 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.chat-tasks .lbl { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.task-chip { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 11px 0 9px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; color: var(--fg); transition: border-color .15s, background .15s; max-width: 100%; }
+.task-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-chip:hover { border-color: var(--line-2); background: var(--hover); }
+.task-chip svg { color: var(--red-line); }
+.msgs { overflow: auto; padding: 16px 24px 12px; }
+.msgs-in { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.msg { line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.me { align-self: flex-end; max-width: 80%; background: var(--field); border: 1px solid var(--line); padding: 8px 14px; border-radius: 16px 16px 4px 16px; }
+.msg.ai { align-self: flex-start; max-width: 100%; display: flex; gap: 12px; }
+.msg.ai .av { width: 24px; height: 24px; display: grid; place-items: center; color: var(--red); margin-top: 1px; }
+.msg.ai.thinking .tx { color: var(--muted); }
+.msg-chips { display: flex; flex-wrap: wrap; gap: 8px; padding-left: 36px; }
+.msg-chips button { border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--muted); text-align: left; }
+.msg-chips button:hover { color: var(--fg); border-color: var(--line-2); }
+.msg .logged { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+.msg .logged button { color: var(--fg); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+.thread .dock { padding: 8px 24px calc(22px + env(safe-area-inset-bottom, 0px)); display: flex; justify-content: center; }
+.thread .composer { width: min(720px, 100%); }
+
+/* Task log + side chat */
+#view-tasklog { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); height: 100%; }
+#view-tasklog.with-side { grid-template-columns: minmax(0, 1fr) clamp(320px, 34vw, 460px); }
+.side-chat { grid-column: 2; grid-row: 1; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; height: 100%; background: var(--bg); border-left: 1px solid var(--line); animation: side-in .22s ease both; }
+@keyframes side-in { from { transform: translateX(24px); opacity: 0; } }
+.side-h { display: flex; align-items: center; gap: 4px; padding: 12px 10px 12px 18px; border-bottom: 1px solid var(--line); }
+.side-t { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.side-t b { font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-t span { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-chat .msgs { padding: 16px 16px 8px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.side-chat .msg.me { max-width: 90%; }
+.side-chat .draft, .side-chat .picker, .side-chat .created { max-width: 100%; }
+.side-chat .dock { padding: 8px 14px 16px; }
+.side-chat .composer { width: 100%; padding-left: 6px; }
+#side-full, #side-close { cursor: pointer; }
+@media (max-width: 1100px) and (min-width: 761px) {
+  #view-tasklog.with-side { grid-template-columns: minmax(0, 1fr); }
+  .side-chat { grid-column: 1; justify-self: end; width: min(400px, 100%); position: relative; z-index: 2; box-shadow: -24px 0 48px rgba(0, 0, 0, .4); }
+}
+.tasklog { grid-column: 1; grid-row: 1; width: 100%; height: 100%; border: 0; display: block; background: var(--bg); }
+
+/* Settings */
+.settings { max-width: 1060px; padding: 26px 64px 64px 64px; }
+.settings h1 { margin: 0 0 30px; font-size: 32px; font-weight: 700; letter-spacing: -0.01em; }
+.settings h2 { margin: 0; padding-bottom: 14px; border-bottom: 1px solid var(--line); font-size: 22px; font-weight: 600; }
+.settings section + section { margin-top: 44px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 0 2px; }
+.row .t b { display: block; font-weight: 500; font-size: 16px; }
+.row .t span { display: block; margin-top: 4px; font-size: 14px; color: var(--muted); }
+.select { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-width: 150px; height: 36px; padding: 0 14px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 15px; transition: background .15s; }
+.select:hover { background: var(--hover); }
+textarea.ci { width: 100%; min-height: 100px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 12px; background: transparent; resize: vertical; font-size: 15px; line-height: 1.5; outline: none; }
+textarea.ci:focus { border-color: #71706A; }
+textarea.ci::placeholder { color: var(--muted); }
+.ci-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.conn { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.conn .ic { width: 34px; height: 34px; border-radius: 9px; background: var(--field); display: grid; place-items: center; font-weight: 700; font-size: 13px; color: var(--muted); flex: none; }
+.conn .t { flex: 1; min-width: 0; }
+.conn .t b { display: block; font-weight: 500; }
+.conn .t span { font-size: 13px; color: var(--muted); }
+.pill-ok { font-size: 12px; font-weight: 600; color: var(--ok); border: 1px solid rgba(127,212,138,.35); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.btn-out { font-size: 13px; font-weight: 600; border: 1px solid var(--line-2); border-radius: 999px; padding: 5px 12px; white-space: nowrap; }
+.btn-out:hover { background: var(--hover); }
+.placeholder { color: var(--muted); font-size: 15px; }
+
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 200%); visibility: hidden; background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; font-size: 14px; transition: transform .3s ease, visibility 0s .3s; z-index: 50; max-width: calc(100% - 32px); }
+.toast.show { transform: translate(-50%, 0); visibility: visible; transition: transform .3s ease; }
+
+@media (max-width: 760px) {
+  .app, .app.collapsed { grid-template-columns: minmax(0,1fr); }
+  #toggle-side { cursor: pointer; }
+  .app > aside { position: fixed; z-index: 20; top: 0; bottom: 0; left: 0; width: 264px; visibility: hidden; transform: translateX(-100%); transition: transform .2s ease, visibility 0s .2s; box-shadow: 10px 0 30px rgba(0,0,0,.4); }
+  .app.mobile-open > aside { visibility: visible; transform: none; transition: transform .2s ease; }
+  .logo .word { font-size: 44px; } .logo svg { width: 52px; height: 52px; }
+  .settings { padding: 18px 16px 48px; }
+  .row { flex-wrap: wrap; }
+  .proto-tag span { max-width: 44vw; overflow: hidden; text-overflow: ellipsis; }
+  .about-cols { grid-template-columns: 1fr; }
+  .about-reset { flex-wrap: wrap; }
+  .chat-tasks, .msgs { padding-left: 16px; padding-right: 16px; }
+  .thread .dock { padding-left: 16px; padding-right: 16px; }
+  #view-tasklog.with-side { grid-template-columns: minmax(0, 1fr); }
+  .side-chat { grid-column: 1; position: relative; z-index: 2; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside aria-label="Sidebar">
+    <nav class="nav-top" aria-label="Main">
+      <button class="nav-btn" id="nav-home" type="button" aria-label="Home">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></svg>
+        <span class="lbl">Home</span>
+      </button>
+      <button class="nav-btn" id="nav-tasklog" type="button" aria-label="Task log">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M8 8.5h8"/><path d="M8 12.5h5"/><path d="M8 16.5h3"/><path d="M14 16l1.5 1.5 3-3"/></svg>
+        <span class="lbl">Task log</span>
+      </button>
+      <button class="nav-btn" id="nav-settings" type="button" aria-label="Settings">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="lbl">Settings</span>
+      </button>
+    </nav>
+
+    <section class="sec" id="side-tasks" aria-labelledby="tasks-h" hidden></section>
+
+    <section class="sec" id="side-chats" aria-labelledby="chats-h">
+      <div class="sec-h">
+        <span id="chats-h"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>Chats</span>
+        <span class="tools">
+          <button class="icon" type="button" id="chat-search-btn" aria-label="Search chats" aria-expanded="false"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
+          <button class="icon" type="button" id="new-chat" aria-label="New chat"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+        </span>
+      </div>
+      <div class="chat-search" id="chat-search" hidden>
+        <label for="chat-q" class="sr">Search chats</label>
+        <input id="chat-q" type="search" autocomplete="off" placeholder="Search chats">
+      </div>
+      <div id="chat-list"></div>
+    </section>
+
+    <div id="side-settings" class="set-nav" hidden></div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="icon" type="button" id="toggle-side" aria-label="Toggle sidebar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M9 3.5v17"/><path d="M15.5 9.5L13 12l2.5 2.5"/></svg></button>
+      <span class="where" id="where"></span>
+      <span class="spacer"></span>
+      <button class="tr-btn" type="button" id="transcript-btn" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg><span>View transcript</span></button>
+      <button class="proto-tag" type="button" id="about-btn" aria-haspopup="dialog" title="About this prototype"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span>Prototype · agent simulated</span></button>
+      
+    </div>
+
+    <div class="view" id="view-home">
+      <div class="home">
+        <div class="logo" aria-label="">
+          <svg width="72" height="72" viewBox="0 0 64 64" fill="none" aria-hidden="true"><circle cx="32" cy="32" r="23" stroke="currentColor" stroke-width="9"/><path d="M20 38c6-10 18-2 24-12" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>
+          <span class="word" aria-hidden="true"></span>
+        </div>
+        <form class="composer" id="home-form" data-composer>
+          <button class="icon" type="button" data-attach aria-label="Add documents" title="Add documents"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+          <label for="home-input" class="sr">Message the agent</label>
+          <input id="home-input" type="text" autocomplete="off" placeholder="Ask anything about your team…">
+          <button class="send" type="submit" aria-label="Send" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg></button>
+        </form>
+        <div class="suggest" id="suggest"></div>
+      </div>
+    </div>
+
+    <div class="view" id="view-chat" hidden>
+      <div class="thread">
+        <div class="chat-tasks" id="chat-tasks"></div>
+        <div class="msgs" id="msgs"><div class="msgs-in" id="msgs-in"></div></div>
+        <div class="dock">
+          <form class="composer" id="chat-form" data-composer>
+            <button class="icon" type="button" data-attach aria-label="Add documents" title="Add documents"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+            <label for="chat-input" class="sr">Message the agent</label>
+            <input id="chat-input" type="text" autocomplete="off" placeholder="Reply…">
+            <button class="send" type="submit" aria-label="Send" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg></button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="view" id="view-tasklog" hidden style="overflow:hidden">
+      <aside class="side-chat" id="side-chat" aria-label="Task chat" hidden>
+        <div class="side-h">
+          <div class="side-t"><b id="side-title"></b><span id="side-sub"></span></div>
+          <button class="icon" type="button" id="side-transcript" aria-label="View chat transcript" title="View transcript"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></button>
+          <button class="icon" type="button" id="side-full" aria-label="Open as a full chat" title="Open as a full chat"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M21 3l-7 7"/><path d="M9 21H3v-6"/><path d="M3 21l7-7"/></svg></button>
+          <button class="icon" type="button" id="side-close" aria-label="Close chat" title="Close"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg></button>
+        </div>
+        <div class="msgs" id="side-msgs"><div class="msgs-in" id="side-msgs-in"></div></div>
+        <div class="dock">
+          <form class="composer" id="side-form" data-composer>
+            <button class="icon" type="button" data-attach aria-label="Add documents" title="Add documents"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+            <label for="side-input" class="sr">Message about this task</label>
+            <input id="side-input" type="text" autocomplete="off" placeholder="Ask a follow-up…">
+            <button class="send" type="submit" aria-label="Send" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg></button>
+          </form>
+        </div>
+      </aside>
+    </div>
+    <div class="view" id="view-settings" hidden></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="tr-overlay" id="transcript" hidden>
+  <div class="tr-scrim" data-tr-close></div>
+  <section class="tr-panel" role="dialog" aria-modal="true" aria-labelledby="tr-title">
+    <header class="tr-head">
+      <div class="tr-t"><b id="tr-title">Chat transcript</b><span id="tr-meta"></span></div>
+      <button class="tr-copy" type="button" id="tr-copy">Copy</button>
+      <button class="icon" type="button" data-tr-close aria-label="Close transcript"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg></button>
+    </header>
+    <ol class="tr-body" id="tr-body"></ol>
+    <textarea id="tr-text" class="sr" readonly aria-hidden="true" tabindex="-1"></textarea>
+  </section>
+</div>
+<div class="tr-overlay" id="about" hidden>
+  <div class="tr-scrim" data-about-close></div>
+  <section class="tr-panel about" role="dialog" aria-modal="true" aria-labelledby="about-title">
+    <header class="tr-head">
+      <div class="tr-t"><b id="about-title">About this prototype</b><span>A product concept for Hyper's task log, by Satya</span></div>
+      <button class="icon" type="button" data-about-close aria-label="Close"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg></button>
+    </header>
+    <div class="about-body">
+      <section>
+        <h3>The concept</h3>
+        <!-- DRAFT: replace with Satya's wording on what the concept is and the gap it fills. -->
+        <p>Hyper's agent does real work for a team: it sends emails, writes documents and follows up with people. Today that work disappears into chat history, so nobody can see what was done, what is still open, or what it was based on.</p>
+        <p>The task log gives every piece of work a home. Each task shows what was done, what needs you, everything that happened, what it produced and the sources it drew on, and you can act on it right there.</p>
+      </section>
+      <section>
+        <h3>What's simulated and what's real</h3>
+        <div class="about-cols">
+          <div>
+            <h4>Simulated</h4>
+            <ul>
+              <li>The agent. Its replies are built from the sample data, not from an AI model.</li>
+              <li>Sending. No email or message ever leaves the page.</li>
+              <li>The people, replies, tools and sources. Priya, Notion, Gmail and the rest are sample data.</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Designed to be real</h4>
+            <ul>
+              <li>The task list and how each status (Needs you, Waiting, Done) is worked out from what's still open.</li>
+              <li>The task page: what was done, needs attention, activity, artifacts and sources.</li>
+              <li>Draft, review, send, and watching the task update. Marking an item handled.</li>
+              <li>The chat beside each task, and tracing any task back to the chat it came from.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section>
+        <h3>What it would take to make it real</h3>
+        <ul>
+          <li><b>The agent.</b> An AI model such as Claude, called through Anthropic's API from a small server, connected to the team's tools (Gmail, Notion, Slack, Sheets) so it can read and act on them.</li>
+          <li><b>What the log stores.</b> One record per task: its name and summary, the open items (who, where, when), every activity, the artifacts themselves, links to the sources, and the chat it came from. A standard database is enough.</li>
+          <li><b>Where it could go wrong.</b> The agent could misread a reply and set the wrong status, so people can always mark items handled or correct them. Sending on someone's behalf needs their approval every time. Sources get edited or deleted, which is why the log keeps showing them. And the log must only show each person what they can already see in the original tools.</li>
+        </ul>
+      </section>
+      <section class="about-links">
+        <a href="CASE-STUDY-URL" target="_blank" rel="noopener">Read the case study</a>
+        <a href="https://github.com/ofsatya/hyper-task-log" target="_blank" rel="noopener">Project files on GitHub</a>
+      </section>
+      <section class="about-reset">
+        <div><b>Reset demo</b><span>Put every task and chat back the way they were when the page opened.</span></div>
+        <button class="btn-ghost" type="button" id="reset-demo">Reset demo</button>
+      </section>
+    </div>
+  </section>
+</div>
+<input type="file" id="doc-input" multiple hidden aria-label="Add a document or files">
+<div class="attach-menu" id="attach-menu" role="menu" hidden>
+  <button type="button" role="menuitem" data-add="doc"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><span>Document</span></button>
+  <button type="button" role="menuitem" data-add="file"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg><span>Files</span></button>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+
+</body></html>
