@@ -85,7 +85,7 @@
     if (api) {
       const n = api.counts(), cur = view.name === "tasklog" ? api.status() : null;
       $("#side-tasks").innerHTML = `<div class="sec-h"><span id="tasks-h">Tasks</span></div>` +
-        [["all", "All tasks"], ["Needs you", "Needs you"], ["Waiting", "Waiting"], ["Done", "Done"]].map(([k, l]) =>
+        [["Needs you", "Needs you"], ["Waiting", "Waiting"], ["Done", "Done"]].map(([k, l]) =>
           `<button type="button" class="status-item${cur === k ? " active" : ""}" data-status="${k}"><span class="dot" style="background:${ST_COLORS[k] || "var(--muted)"}"></span>${l}<span class="n">${n[k] ?? 0}</span></button>`).join("");
     }
     if (inSettings) {
