@@ -42,7 +42,3 @@ Then open http://localhost:8000 in your browser. Press `Ctrl+C` in the terminal 
 | `tasklog.js` | How the task log behaves, including the simulated agent's answers. |
 | `data.js` | The example data: the sample tasks and chats the demo opens with. |
 | `assets/` | Tab icon, link preview image and the demo GIF. |
-
-## How I directed Claude
-
-<!-- Satya: write this section. -->
