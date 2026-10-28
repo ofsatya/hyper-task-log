@@ -80,9 +80,10 @@
     ["home", "tasklog", "settings"].forEach((k) => $("#nav-" + k).setAttribute("aria-current", $("#nav-" + k).classList.contains("active") ? "page" : "false"));
     $("#side-chats").hidden = inSettings; $("#side-settings").hidden = !inSettings;
     const api = tl();
-    $("#side-tasks").hidden = view.name !== "tasklog" || !api;
-    if (view.name === "tasklog" && api) {
-      const n = api.counts(), cur = api.status();
+    // The task statuses stay in the sidebar in every view; one is highlighted only while the Task log shows it.
+    $("#side-tasks").hidden = !api;
+    if (api) {
+      const n = api.counts(), cur = view.name === "tasklog" ? api.status() : null;
       $("#side-tasks").innerHTML = `<div class="sec-h"><span id="tasks-h">Tasks</span></div>` +
         [["all", "All tasks"], ["Needs you", "Needs you"], ["Waiting", "Waiting"], ["Done", "Done"]].map(([k, l]) =>
           `<button type="button" class="status-item${cur === k ? " active" : ""}" data-status="${k}"><span class="dot" style="background:${ST_COLORS[k] || "var(--muted)"}"></span>${l}<span class="n">${n[k] ?? 0}</span></button>`).join("");

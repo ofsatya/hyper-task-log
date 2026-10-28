@@ -210,13 +210,6 @@ h2.sec { margin: 0; font-size: 20px; font-weight: 700; }
 .spin svg { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .ask { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line-2); border-radius: 14px; padding: 6px 6px 6px 8px; }
-.ask-plus { width: 32px; height: 32px; flex: none; border: 0; border-radius: 999px; background: transparent; color: var(--muted); display: grid; place-items: center; }
-.ask-plus:hover, .ask-plus[aria-expanded="true"] { background: var(--raised); color: var(--fg); }
-.plus-wrap { position: relative; flex: none; }
-.plus-menu { position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 20; min-width: 180px; padding: 6px; background: var(--raised); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: 0 14px 34px rgba(0,0,0,.45); display: grid; }
-.plus-menu button { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; font-size: 14px; font-weight: 500; text-align: left; }
-.plus-menu button:hover { background: var(--line); }
-.plus-menu svg { width: 18px; height: 18px; flex: none; }
 .ask:focus-within { border-color: var(--line-2); }
 .ask input { flex: 1 1 auto; min-width: 0; border: 0; background: transparent; font-size: 15px; outline: none; height: 32px; }
 .ask input::placeholder { color: var(--faint); }
@@ -297,6 +290,8 @@ button.src:hover svg { transform: translateX(3px); }
 .draft-actions .btn-lime { height: 36px; padding: 0 16px; display: inline-flex; align-items: center; gap: 8px; }
 .btn-ghost { height: 36px; padding: 0 14px; border: 1px solid var(--line-2); border-radius: 10px; background: transparent; font-size: 14px; font-weight: 600; }
 .btn-ghost:hover { background: var(--raised); }
+.ask-btn { align-self: flex-start; height: 44px; display: inline-flex; align-items: center; gap: 10px; padding: 0 18px; font-size: 15px; color: var(--fg); }
+.ask-btn:hover { background: var(--raised); }
 .draft-status { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
 .draft-status.sent { color: var(--fg); }
 .draft-status.sent svg { color: var(--lime); }

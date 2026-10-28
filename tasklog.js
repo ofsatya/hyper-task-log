@@ -17,6 +17,7 @@
     check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
     doc: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7CC4FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
     email: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F2B36B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
+    chat: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>',
     chart: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E3211A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 16l4-5 3 3 5-6"/></svg>',
   };
   const KIND = { doc: "Document", email: "Email", chart: "Chart" };
@@ -185,21 +186,16 @@
         </div>
       </header>
 
-      <section class="summary" aria-labelledby="cb-sum">
-        <h2 id="cb-sum" class="eyebrow">What was done</h2>
-        <p class="summary-text" id="summary-text">${esc(p.summary)}</p>
-        <form class="ask" id="ask-form">
-          <label for="cb-ask" class="sr">Ask about this task</label>
-          <span class="plus-wrap"><button type="button" class="ask-plus" data-plus aria-label="Add a document or files" aria-haspopup="true" aria-expanded="false">${I.plus}</button><span class="plus-menu" role="menu" hidden><button type="button" role="menuitem" data-add="doc">${I.doc}<span>Document</span></button><button type="button" role="menuitem" data-add="file">${I.clip}<span>Files</span></button></span></span>
-          <input id="cb-ask" type="text" autocomplete="off" placeholder="Ask about this task or tell ${AI} what to do next…">
-          <button type="submit" class="btn-lime">Ask</button>
-        </form>
-      </section>
-
       ${p.attention.length ? `<section class="attn" aria-labelledby="cb-attn" style="display:flex;flex-direction:column;gap:14px">
         <div class="sec-head"><h2 id="cb-attn" class="sec">Needs attention <span class="count-pill">${p.attention.length}</span></h2><p class="sec-sub">What's still open from this task's work: replies to answer, things ${AI} flagged, and people who haven't replied.</p></div>
         <ul class="attn-list">${attn}</ul>
       </section>` : ""}
+
+      <section class="summary" aria-labelledby="cb-sum">
+        <h2 id="cb-sum" class="eyebrow">What was done</h2>
+        <p class="summary-text" id="summary-text">${esc(p.summary)}</p>
+        <button type="button" class="btn-ghost ask-btn" data-ask>${I.chat}Ask about this task</button>
+      </section>
 
       <section class="activity" aria-labelledby="cb-act" style="display:flex;flex-direction:column;gap:14px">
         <div class="sec-head"><h2 id="cb-act" class="sec">Activity</h2><p class="sec-sub">Everything that happened on this task, newest first. Replies and follow-ups you send later are added here.</p></div>
@@ -524,7 +520,6 @@
     e.preventDefault();
     const p = current();
     if (e.target.id === "search-form") { const a = $("#rows a"); a && (location.hash = a.getAttribute("href")); }
-    if (e.target.id === "ask-form" && p) { const v = $("#cb-ask").value.trim(); $("#cb-ask").value = ""; if (host) host.startTaskChat(p.id, v || null); else openChat(p, v || null); }
     if (e.target.id === "chat-form" && p) { const i = $("#chat-input"), v = i.value.trim(); if (v) { i.value = ""; send(p, v); } }
   });
   document.addEventListener("click", (e) => {
@@ -545,11 +540,8 @@
     if (t.closest("#clear-q")) { ui.q = ""; ui.range = 0; ui.status = "all"; ui.ids = null; notifyHost(); renderHome(); $("#hm-q").focus(); return; }
     if (!p) return;
     const oc = t.closest("[data-open-chat]"); if (oc && host) { host.openChat(oc.dataset.openChat); return; }
-    const pl = t.closest("[data-plus]");
-    if (pl) { const m = pl.nextElementSibling; m.hidden = !m.hidden; pl.setAttribute("aria-expanded", String(!m.hidden)); return; }
-    const ad = t.closest("[data-add]");
-    document.querySelectorAll(".plus-menu").forEach((m) => { m.hidden = true; m.previousElementSibling?.setAttribute("aria-expanded", "false"); });
-    if (ad) { const act = ad.dataset.add === "doc" ? "add-doc" : "add-file"; if (host) host.runAction(p.id, act); else runLocal(p, act); return; }
+    // Questions about the task happen in its chat: the side chat in the app, the chat drawer on its own.
+    if (t.closest("[data-ask]")) { if (host) host.startTaskChat(p.id, null); else openChat(p, null); return; }
     const ac = t.closest("[data-act]");
     if (ac && !ac.disabled) {
       const act = ac.dataset.act, attnId = ac.dataset.attn || null;
