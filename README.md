@@ -15,7 +15,7 @@ Start with **Ask 5 customers for product feedback**: reply to Priya, review the 
 | **The agent.** Its replies are built from the sample data, not from an AI model. | **The task list**, and how each status (Needs you, Waiting, Done) is worked out from what's still open. |
 | **Sending.** No email or message ever leaves the page. | **The task page**: what was done, needs attention, activity, artifacts and sources. |
 | **The people, replies, tools and sources.** Priya, Notion, Gmail and the rest are sample data. | **Draft, review, send**, and watching the task update. Marking an item handled. |
-| | **The chat beside each task**, and tracing any task back to the chat it came from. |
+| | **The task chat beside each task**, and tracing any task back to the chat it came from. |
 
 Home, Settings, chat search and new chat are outside the scope of this demo and say so when clicked. **Reset demo**, in the *Prototype · agent simulated* window, puts everything back as it was when the page opened.
 

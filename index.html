@@ -240,7 +240,7 @@ aside { background: var(--side); overflow: hidden auto; display: flex; flex-dire
 .thread .dock { padding: 8px 24px calc(22px + env(safe-area-inset-bottom, 0px)); display: flex; justify-content: center; }
 .thread .composer { width: min(720px, 100%); }
 
-/* Task log + side chat */
+/* Task log + task chat */
 #view-tasklog { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); height: 100%; }
 #view-tasklog.with-side { grid-template-columns: minmax(0, 1fr) clamp(320px, 34vw, 460px); }
 .side-chat { grid-column: 2; grid-row: 1; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; height: 100%; background: var(--bg); border-left: 1px solid var(--line); animation: side-in .22s ease both; }
@@ -362,7 +362,7 @@ textarea.ci::placeholder { color: var(--muted); }
           <span class="word" aria-hidden="true"></span>
         </div>
         <form class="composer" id="home-form" data-composer>
-          <button class="icon" type="button" data-attach aria-label="Add documents" title="Add documents"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+          <button class="icon" type="button" data-attach aria-label="Add attachment" title="Add attachment"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
           <label for="home-input" class="sr">Message the agent</label>
           <input id="home-input" type="text" autocomplete="off" placeholder="Ask anything about your team…">
           <button class="send" type="submit" aria-label="Send" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg></button>
@@ -377,7 +377,7 @@ textarea.ci::placeholder { color: var(--muted); }
         <div class="msgs" id="msgs"><div class="msgs-in" id="msgs-in"></div></div>
         <div class="dock">
           <form class="composer" id="chat-form" data-composer>
-            <button class="icon" type="button" data-attach aria-label="Add documents" title="Add documents"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+            <button class="icon" type="button" data-attach aria-label="Add attachment" title="Add attachment"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
             <label for="chat-input" class="sr">Message the agent</label>
             <input id="chat-input" type="text" autocomplete="off" placeholder="Reply…">
             <button class="send" type="submit" aria-label="Send" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg></button>
@@ -397,7 +397,7 @@ textarea.ci::placeholder { color: var(--muted); }
         <div class="msgs" id="side-msgs"><div class="msgs-in" id="side-msgs-in"></div></div>
         <div class="dock">
           <form class="composer" id="side-form" data-composer>
-            <button class="icon" type="button" data-attach aria-label="Add documents" title="Add documents"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+            <button class="icon" type="button" data-attach aria-label="Add attachment" title="Add attachment"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
             <label for="side-input" class="sr">Message about this task</label>
             <input id="side-input" type="text" autocomplete="off" placeholder="Ask a follow-up…">
             <button class="send" type="submit" aria-label="Send" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg></button>
@@ -452,7 +452,7 @@ textarea.ci::placeholder { color: var(--muted); }
               <li>The task list and how each status (Needs you, Waiting, Done) is worked out from what's still open.</li>
               <li>The task page: what was done, needs attention, activity, artifacts and sources.</li>
               <li>Draft, review, send, and watching the task update. Marking an item handled.</li>
-              <li>The chat beside each task, and tracing any task back to the chat it came from.</li>
+              <li>The task chat beside each task, and tracing any task back to the chat it came from.</li>
             </ul>
           </div>
         </div>
@@ -476,10 +476,9 @@ textarea.ci::placeholder { color: var(--muted); }
     </div>
   </section>
 </div>
-<input type="file" id="doc-input" multiple hidden aria-label="Add a document or files">
+<input type="file" id="doc-input" multiple hidden aria-label="Add attachment">
 <div class="attach-menu" id="attach-menu" role="menu" hidden>
-  <button type="button" role="menuitem" data-add="doc"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><span>Document</span></button>
-  <button type="button" role="menuitem" data-add="file"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg><span>Files</span></button>
+  <button type="button" role="menuitem" data-add="file">Add attachment</button>
 </div>
 
 <script src="data.js"></script>

@@ -359,7 +359,7 @@
     if (act === "add-doc" || act === "add-file") { pickDocs({ taskId, kind: act === "add-doc" ? "doc" : "file" }); return; }
     const label = { followup: "Follow up", reply: "Reply", recalibrate: "Recalibrate" }[act];
     const c = newChat(`${label}: ${p.name}`, [taskId]);
-    // Anything started from the Task log runs in the side chat, so the task stays in view.
+    // Anything started from the Task log runs in the task chat, so the task stays in view.
     if (view.name === "tasklog") openSide(c.id); else go({ name: "chat", id: c.id });
     if (act === "recalibrate") {
       c.msgs.push({ role: "user", text: "Recalibrate this task with the latest sources." });
@@ -427,7 +427,7 @@
   // Shared with the embedded task log so tasks can trace back to chats.
   window.appBridge = {
     chatsForTask: (id) => state.chats.filter((c) => c.tasks.includes(id)).map((c) => ({ id: c.id, title: c.title, time: c.time.getTime() })),
-    // Chat links on a task page open in the side chat instead of leaving the task.
+    // Chat links on a task page open in the task chat instead of leaving the task.
     openChat: (id) => (view.name === "tasklog" ? openSide(id) : go({ name: "chat", id })),
     startTaskChat(taskId, q) {
       const c = newChat(q || `About: ${taskName(taskId)}`, [taskId]);
@@ -438,7 +438,7 @@
     runAction,
     name: NAME,
     onTasksChanged: () => renderSide(),
-    // The side chat belongs to a task page: it closes on the task list or when another task opens.
+    // The task chat belongs to a task page: it closes on the task list or when another task opens.
     onRoute(taskId) {
       if (!side.id) return;
       const c = state.chats.find((x) => x.id === side.id);

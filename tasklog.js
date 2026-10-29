@@ -354,7 +354,7 @@
     openOverlay(head(name, `Source · ${kind}`) + `<div class="modal-b"><p>This is where <b>${esc(name)}</b> would open in its own app.</p><p style="color:var(--muted)">In this prototype, sources show as a preview only.</p></div>`, "modal");
   }
 
-  // ---------- task chat (standalone page only; inside the app the side chat is used) ----------
+  // ---------- task chat (standalone page only; inside the app the task chat is used) ----------
   function openChat(p, first, attnId, act) {
     ui.pendingAttn = attnId || null; ui.pendingAct = act || null;
     const log = (ui.chats[p.id] ||= []);
@@ -540,7 +540,7 @@
     if (t.closest("#clear-q")) { ui.q = ""; ui.range = 0; ui.status = "all"; ui.ids = null; notifyHost(); renderHome(); $("#hm-q").focus(); return; }
     if (!p) return;
     const oc = t.closest("[data-open-chat]"); if (oc && host) { host.openChat(oc.dataset.openChat); return; }
-    // Questions about the task happen in its chat: the side chat in the app, the chat drawer on its own.
+    // Questions about the task happen in its chat: the task chat in the app, the chat drawer on its own.
     if (t.closest("[data-ask]")) { if (host) host.startTaskChat(p.id, null); else openChat(p, null); return; }
     const ac = t.closest("[data-act]");
     if (ac && !ac.disabled) {
