@@ -60,8 +60,9 @@
   // ---------- navigation with back/forward ----------
   let view = { name: "tasklog" };
   const hist = [view]; let pos = 0;
+  let fwdTask = null; // the task page you just stepped back out of, so Forward can return to it
   function go(v, push = true) {
-    if (push) { hist.splice(pos + 1); hist.push(v); pos = hist.length - 1; }
+    if (push) { hist.splice(pos + 1); hist.push(v); pos = hist.length - 1; fwdTask = null; }
     view = v; render();
     if (matchMedia("(max-width: 760px)").matches) $("#app").classList.remove("mobile-open");
   }
@@ -96,7 +97,8 @@
     const q = chatQ.trim().toLowerCase();
     const list = state.chats.filter((c) => !q || c.title.toLowerCase().includes(q) || c.tasks.some((t) => taskName(t).toLowerCase().includes(q)));
     $("#chat-list").innerHTML = list.length ? list.map((c) => `<div class="item${view.name === "chat" && view.id === c.id ? " active" : ""}">
-        <button class="item-main" type="button" data-chat="${c.id}" title="${esc(c.title)}"><span class="nm">${esc(c.title)}</span><span class="tm">${fmt(c.time)}</span></button>
+        ${renamingId === c.id ? `<div class="item-main rename"><label for="rename-input" class="sr">Rename conversation</label><input id="rename-input" type="text" value="${esc(c.title)}" autocomplete="off"></div>` : `<button class="item-main" type="button" data-chat="${c.id}" title="${esc(c.title)}"><span class="nm">${c.fav ? '<span class="fav" aria-label="Favorite">★</span> ' : ""}${esc(c.title)}</span><span class="tm">${fmt(c.time)}</span></button>`}
+        <button class="kebab" type="button" data-kebab="${c.id}" aria-haspopup="menu" aria-expanded="false" aria-label="Options for ${esc(c.title)}"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5.5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18.5" cy="12" r="1.6"/></svg></button>
         ${c.tasks.length ? `<button type="button" class="sub" data-chat-tasks="${c.id}" title="Show these tasks in the Task log">${TASK_IC}${c.tasks.length} ${c.tasks.length === 1 ? "task" : "tasks"}</button>` : `<span class="sub" style="margin:0 6px 4px">${TASK_IC}No tasks yet</span>`}
       </div>`).join("") : `<div class="empty-side">No chats match “${esc(chatQ)}”.</div>`;
   }
@@ -140,14 +142,15 @@
   }
   const side = { id: null };
   const sideOpen = () => !$("#side-chat").hidden;
+  const syncAsk = () => { try { tasklogFrame?.contentDocument?.documentElement.classList.toggle("side-open", sideOpen()); } catch {} };
   function openSide(id) {
     const c = state.chats.find((x) => x.id === id); if (!c) return;
-    side.id = id; $("#side-chat").hidden = false; $("#view-tasklog").classList.add("with-side");
+    side.id = id; $("#side-chat").hidden = false; $("#view-tasklog").classList.add("with-side"); syncAsk();
     $("#side-title").textContent = c.title;
     $("#side-sub").textContent = c.tasks.length ? `Linked to ${taskName(c.tasks[0])}` : "";
     renderThread(c); renderSide();
   }
-  function closeSide() { side.id = null; $("#side-chat").hidden = true; $("#view-tasklog").classList.remove("with-side"); $("#side-msgs-in").innerHTML = ""; }
+  function closeSide() { side.id = null; $("#side-chat").hidden = true; $("#view-tasklog").classList.remove("with-side"); $("#side-msgs-in").innerHTML = ""; syncAsk(); }
   function renderThread(c, pending) {
     c.msgs.forEach((m) => { m.at ||= Date.now(); });
     const inMain = view.name === "chat" && view.id === c.id;
@@ -160,7 +163,14 @@
       return;
     }
     $("#side-msgs-in").innerHTML = "";
-    $("#chat-tasks").innerHTML = `<div class="chat-tasks-in"><span class="lbl">Tasks in this chat</span>${c.tasks.length
+    // A chat that began as a task chat shows the original request and reply once it is opened in the main window,
+    // so the thread never looks empty or like the transcript went missing. Tasks are logged automatically, so the request is the work itself.
+    if (c.fromTask && !c.seeded) {
+      c.seeded = true;
+      const ph = PLACEHOLDERS[c.tasks[0]] || [`Take care of \u201c${taskName(c.tasks[0])}\u201d.`, "On it. I've set it up and I'll track progress on the task."];
+      c.msgs.unshift({ role: "user", text: ph[0], placeholder: true }, { role: "ai", text: ph[1], logged: c.tasks[0], placeholder: true });
+    }
+    $("#chat-tasks").innerHTML = `<div class="chat-tasks-in"><span class="lbl sr">Tasks in this chat</span>${c.tasks.length
       ? c.tasks.map((t) => `<button type="button" class="task-chip" data-task="${t}" title="Open in Task log">${TASK_IC}<span>${esc(taskName(t))}</span></button>`).join("")
       : `<span style="font-size:13px;color:var(--faint)">None yet. Tasks are logged as the work takes shape.</span>`}</div>`;
     $("#msgs-in").innerHTML = msgsHtml(c, pending);
@@ -171,7 +181,7 @@
     return c.msgs.map((m, i) => m.role === "user"
       ? `<div class="msg me">${esc(m.text)}</div>`
       : `<div class="msg ai"><span class="av">${MARK}</span><div class="tx">${esc(m.text)}${m.draft ? draftCard(m, i) : ""}${m.created ? createdNote(m, i) : ""}${m.picker ? pickerCard(m, i) : ""}${m.logged ? `<div class="logged">${TASK_IC} Logged to <button type="button" data-task="${m.logged}">${esc(taskName(m.logged))}</button></div>` : ""}</div></div>`).join("")
-      + (pending === undefined && (!last || last.text === GENERAL_FALLBACK || last.text === tl()?.fallback) ? `<div class="msg-chips">${suggestionsFor(c).map((q) => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>` : "")
+      + (pending === undefined && (!last || last.placeholder || last.text === GENERAL_FALLBACK || last.text === tl()?.fallback) ? `<div class="msg-chips">${suggestionsFor(c).map((q) => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>` : "")
       + (pending !== undefined ? `<div class="msg ai thinking" id="pending"><span class="av">${MARK}</span><div class="tx">${pending ? esc(pending) : "Thinking…"}</div></div>` : "");
   }
   function renderSettings() {
@@ -204,7 +214,7 @@
     if (tasklogFrame) return;
     tasklogFrame = document.createElement("iframe");
     tasklogFrame.className = "tasklog"; tasklogFrame.title = "Task log";
-    tasklogFrame.addEventListener("load", () => { frameReady = true; if (pendingTask !== null) openTaskInFrame(pendingTask); renderSide(); });
+    tasklogFrame.addEventListener("load", () => { frameReady = true; syncAsk(); if (pendingTask !== null) openTaskInFrame(pendingTask); renderSide(); updateNav(); });
     tasklogFrame.src = "tasklog.html";
     $("#view-tasklog").prepend(tasklogFrame);
   }
@@ -212,6 +222,23 @@
     if (!frameReady) { pendingTask = id; return; }
     try { const w = tasklogFrame.contentWindow; if (w.location.hash.slice(1) === id) w.taskApi?.refresh(); else w.location.hash = id; pendingTask = null; }
     catch { pendingTask = null; }
+  }
+  // ---------- top-bar back / forward ----------
+  // Back leaves a task page for the list first, then steps through the screens you've visited.
+  const frameHash = () => { try { return tasklogFrame?.contentWindow.location.hash.slice(1) || ""; } catch { return ""; } };
+  function updateNav() {
+    const onTask = view.name === "tasklog" && frameReady && !!frameHash();
+    $("#nav-back").disabled = !(onTask || pos > 0);
+    $("#nav-fwd").disabled = !((view.name === "tasklog" && frameReady && !onTask && fwdTask) || pos < hist.length - 1);
+  }
+  function navBack() {
+    const open = view.name === "tasklog" && frameReady ? frameHash() : "";
+    if (open) { fwdTask = open; tl()?.showList(); return; }
+    if (pos > 0) { fwdTask = null; go(hist[--pos], false); }
+  }
+  function navFwd() {
+    if (view.name === "tasklog" && frameReady && !frameHash() && fwdTask) { const id = fwdTask; fwdTask = null; openTaskInFrame(id); return; }
+    if (pos < hist.length - 1) go(hist[++pos], false);
   }
   function render() {
     ["home", "chat", "tasklog", "settings"].forEach((k) => ($("#view-" + k).hidden = view.name !== k));
@@ -224,6 +251,7 @@
     $("#where").textContent = where;
     $("#transcript-btn").hidden = view.name !== "chat";
     renderSide();
+    updateNav();
   }
 
   // ---------- chat ----------
@@ -278,8 +306,19 @@
     await new Promise((r) => setTimeout(r, 600));
     return templateDraft(p, q);
   }
+  const PLACEHOLDERS = {
+    "customer-feedback": ["Ask five of our most active customers for feedback on the new onboarding.", "Done. I emailed Priya (Northwind), Leo (Brightside) and three others, asking for 15 minutes this week. I'll track their replies on the task."],
+    "weekly-update": ["Write this week's team update from our Notion notes.", "The draft is ready and with Alex for a quick check. I'll track it on the task."],
+    "candidate-follow-up": ["Send Jordan a thank-you note after today's interview.", "Sent. I thanked Jordan for their time and said we'll be in touch by Friday. I'll watch for a reply."],
+    "invoice-reminder": ["Remind Acme Studio about invoice #1042.", "Reminder sent to Acme Studio. I'll track whether they reply."],
+    "meeting-summary": ["Summarise Monday's team meeting.", "The summary is ready, with action items, and saved on the task."],
+    "blog-post": ["Draft a blog post for the launch.", "The post is drafted and with Sam for review. I'll track it on the task."],
+    "laptop-quotes": ["Get laptop quotes from our two suppliers.", "Both suppliers have quoted for 4 laptops. Supplier B is $280 cheaper. The comparison is saved on the task."],
+    "team-lunch": ["Book a team lunch for Friday.", "Lunch is booked at Lucia's, Friday at 1pm, table for 8."],
+  };
   function newChat(title, tasks = []) {
     const c = { id: "c" + Date.now(), title: title.length > 42 ? title.slice(0, 42) + "…" : title, time: new Date(), tasks, msgs: [] };
+    if (tasks.length) c.fromTask = true;
     state.chats.unshift(c); return c;
   }
   async function send(text, target) {
@@ -440,6 +479,7 @@
     onTasksChanged: () => renderSide(),
     // The task chat belongs to a task page: it closes on the task list or when another task opens.
     onRoute(taskId) {
+      updateNav();
       if (!side.id) return;
       const c = state.chats.find((x) => x.id === side.id);
       if (!taskId || !c || !c.tasks.includes(taskId)) { closeSide(); renderSide(); }
@@ -453,15 +493,60 @@
   $("#suggest").innerHTML = ["What am I working on this week?", "Any replies from customers?", "What's left on the weekly update?"].map((q) => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join("");
 
   // ---------- events ----------
+  // ---------- chat item menu ----------
+  let renamingId = null;
+  function chatAction(act, c) {
+    if (act === "tasks") { tl()?.showList({ ids: c.tasks, label: c.title }); go({ name: "tasklog" }); return; }
+    if (act === "fav") { c.fav = !c.fav; renderSide(); toast(c.fav ? "Added to Favorites" : "Removed from Favorites"); return; }
+    if (act === "rename") { renamingId = c.id; renderSide(); const i = $("#rename-input"); i?.focus(); i?.select(); return; }
+    if (act === "delete") {
+      const i = state.chats.indexOf(c); if (i < 0) return; state.chats.splice(i, 1);
+      if (side.id === c.id) closeSide();
+      if (view.name === "chat" && view.id === c.id) { go({ name: "home" }); } else renderSide();
+      toast("Conversation deleted");
+    }
+  }
+  function finishRename(save) {
+    const c = state.chats.find((x) => x.id === renamingId), v = $("#rename-input")?.value.trim();
+    renamingId = null;
+    if (c && save && v && v !== c.title) { c.title = v; if (view.name === "chat" && view.id === c.id) $("#where").textContent = v; toast("Conversation renamed"); }
+    renderSide();
+  }
+  function closeChatMenu() { document.querySelector(".chat-menu")?.remove(); document.querySelectorAll(".kebab[aria-expanded=true]").forEach((k) => { k.setAttribute("aria-expanded", "false"); k.closest(".item")?.classList.remove("menu-open"); }); }
+  function openChatMenu(btn) {
+    const c = state.chats.find((x) => x.id === btn.dataset.kebab); if (!c) return;
+    const IC = (d) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+    const STAR = IC('<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/>');
+    const PEN = IC('<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z"/><path d="M14.5 6.5l3 3"/>');
+    const BIN = IC('<path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l1 13h9l1-13"/><path d="M10 11v6M14 11v6"/>');
+    const m = document.createElement("div"); m.className = "chat-menu"; m.setAttribute("role", "menu");
+    m.innerHTML = `<div class="cm-h">Conversation</div>`
+      + (c.tasks.length ? `<button type="button" role="menuitem" data-cm="tasks" data-id="${c.id}">${TASK_IC}Show ${c.tasks.length === 1 ? "1 task" : c.tasks.length + " tasks"} in Task log</button>` : "")
+      + `<button type="button" role="menuitem" data-cm="fav" data-id="${c.id}">${STAR}${c.fav ? "Remove from Favorites" : "Add to Favorites"}</button>`
+      + `<button type="button" role="menuitem" data-cm="rename" data-id="${c.id}">${PEN}Rename</button>`
+      + `<button type="button" role="menuitem" class="danger" data-cm="delete" data-id="${c.id}">${BIN}Delete</button>`;
+    document.body.appendChild(m);
+    const r = btn.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
+    m.style.left = Math.max(8, Math.min(r.right - w + 4, innerWidth - w - 8)) + "px";
+    m.style.top = (r.bottom + 6 + h > innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6) + "px";
+    btn.setAttribute("aria-expanded", "true"); btn.closest(".item")?.classList.add("menu-open");
+    m.querySelector("button")?.focus();
+  }
   let toastT;
   const toast = (m) => { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2000); };
   const closeMenus = (except) => document.querySelectorAll(".dd .menu").forEach((m) => { if (m !== except) { m.hidden = true; m.previousElementSibling?.setAttribute("aria-expanded", "false"); } });
   document.addEventListener("click", (e) => {
     const t = e.target;
     // Scoped prototype: the Task log, chats and tracing links work; Home, Settings, search and new chat say they aren't part of the demo.
-    if (t.closest("#nav-home, #nav-settings, #chat-search-btn, #new-chat")) { toast("Not part of this demo."); return; }
+    if (t.closest("#nav-home")) { go({ name: "home" }); return; }
+    if (t.closest("#nav-settings, #chat-search-btn, #new-chat")) { toast("Not part of this demo."); return; }
+    if (t.closest("#nav-back")) { navBack(); return; }
+    if (t.closest("#nav-fwd")) { navFwd(); return; }
     if (t.closest("#nav-tasklog")) { tl()?.showList(); go({ name: "tasklog" }); return; }
     const sf = t.closest("[data-status]"); if (sf) { tl()?.showList({ status: sf.dataset.status }); go({ name: "tasklog" }); return; }
+    const cm = t.closest("[data-cm]"); if (cm) { const c = state.chats.find((x) => x.id === cm.dataset.id); closeChatMenu(); if (c) chatAction(cm.dataset.cm, c); return; }
+    const kb = t.closest("[data-kebab]"); if (kb) { const was = kb.getAttribute("aria-expanded") === "true"; closeChatMenu(); if (!was) openChatMenu(kb); return; }
+    if (!t.closest(".chat-menu")) closeChatMenu();
     const ct = t.closest("[data-chat-tasks]"); if (ct) { const c = state.chats.find((x) => x.id === ct.dataset.chatTasks); if (c) { tl()?.showList({ ids: c.tasks, label: c.title }); go({ name: "tasklog" }); } return; }
     const chB = t.closest("[data-chat]"); if (chB) { go({ name: "chat", id: chB.dataset.chat }); return; }
     const tkB = t.closest("[data-task]"); if (tkB) { go({ name: "tasklog", task: tkB.dataset.task }); return; }
@@ -503,7 +588,9 @@
     if (e.target.id === "chat-q") { chatQ = e.target.value; renderSide(); }
     if (e.target.id === "ci") { state.prefs.instructions = e.target.value; $("#ci-count").textContent = `${e.target.value.length}/2000`; savePrefs(); }
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeMenus(); closeTranscript(); $("#about").hidden = true; } });
+  document.addEventListener("keydown", (e) => { if (e.target.id === "rename-input") { if (e.key === "Enter") { e.preventDefault(); finishRename(true); } else if (e.key === "Escape") { e.stopPropagation(); finishRename(false); } return; } });
+  document.addEventListener("focusout", (e) => { if (e.target.id === "rename-input" && renamingId) finishRename(true); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeChatMenu(); closeMenus(); closeTranscript(); $("#about").hidden = true; } });
 
   render();
 })();

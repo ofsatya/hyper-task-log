@@ -159,7 +159,7 @@
   }
   const chatTitle = (e) => e.chatTitle || CH[e.chat] || "a chat";
   const chatLink = (e) => (!e.chat ? "" : host ? `<button type="button" class="lnk" data-open-chat="${esc(e.chat)}">${esc(chatTitle(e))}</button>` : `<span>${esc(chatTitle(e))}</span>`);
-  const ATTN_TAG = { reply: (x) => `Reply · ${x.via}`, flag: () => `Flagged by ${AI}`, waiting: (x) => `No reply · ${x.via}` };
+  const ATTN_TAG = { reply: (x) => `${x.via}`, flag: () => `Flagged by ${AI}`, waiting: (x) => `${x.via}` };
   function renderProject(p) {
     const el = $("#project");
     const origin = [...p.activity].reverse().find((e) => e.chat);
@@ -178,50 +178,39 @@
     }).join("");
     el.innerHTML = `
       <header class="proj-h">
-        <a class="icon-btn back-btn" href="#" aria-label="Go back to all tasks" title="Back">${I.back}</a>
-        <div style="min-width:0">
-          <div class="crumb"><a href="#">All tasks</a></div>
+        ${host ? "" : `<a class="icon-btn back-btn" href="#" aria-label="Go back to all tasks" title="Back">${I.back}</a>`}
+        <div class="proj-title">
           <h1>${esc(p.name)}</h1>
-          <div class="proj-meta">${stPill(p.status)}<span>Last activity <b>${esc(stamp(lastTouched(p)))}</b></span>${origin ? `<span>Logged from ${chatLink(origin)}</span>` : ""}</div>
+          <div class="proj-meta">${stPill(p.status)}${origin ? `<span>Logged from ${chatLink(origin)}</span>` : ""}</div>
         </div>
+        <button type="button" class="ask-main" data-ask aria-label="Ask about this task">${I.chat}<span>Ask</span></button>
       </header>
 
-      ${p.attention.length ? `<section class="attn" aria-labelledby="cb-attn" style="display:flex;flex-direction:column;gap:14px">
-        <div class="sec-head"><h2 id="cb-attn" class="sec">Needs attention <span class="count-pill">${p.attention.length}</span></h2><p class="sec-sub">What's still open from this task's work: replies to answer, things ${AI} flagged, and people who haven't replied.</p></div>
-        <ul class="attn-list">${attn}</ul>
-      </section>` : ""}
+      ${p.attention.length ? `<ul class="attn-list" aria-label="Needs attention">${attn}</ul>` : ""}
 
-      <section class="summary" aria-labelledby="cb-sum">
-        <h2 id="cb-sum" class="eyebrow">What was done</h2>
-        <p class="summary-text" id="summary-text">${esc(p.summary)}</p>
-        <button type="button" class="btn-ghost ask-btn" data-ask>${I.chat}Ask about this task</button>
-      </section>
-
-      <section class="activity" aria-labelledby="cb-act" style="display:flex;flex-direction:column;gap:14px">
-        <div class="sec-head"><h2 id="cb-act" class="sec">Activity</h2><p class="sec-sub">Everything that happened on this task, newest first. Replies and follow-ups you send later are added here.</p></div>
+      <section class="activity" aria-labelledby="cb-act">
+        <h2 id="cb-act" class="sec">Activity</h2>
         <ol class="tl">${acts}</ol>
       </section>
 
-      <section aria-labelledby="cb-art" style="display:flex;flex-direction:column;gap:20px">
-        <div class="sec-head"><h2 id="cb-art" class="sec">Artifacts</h2><p class="sec-sub">What this task has produced so far: documents, emails and charts, newest first.</p></div>
+      <section class="artifacts" aria-labelledby="cb-art">
+        <h2 id="cb-art" class="sec">Artifacts</h2>
         ${p.artifacts.length ? groups(p).map((g) => `
           <div class="art-group">
             <p class="date">${esc(dayLabel(g.date))}</p>
             <div class="art-grid">
               ${g.items.map((a) => `<button type="button" class="card" data-art="${a.i}">${I[a.kind]}<span class="nm"><b>${esc(a.name)}</b><span>${KIND[a.kind]}</span></span></button>`).join("")}
             </div>
-          </div>`).join("") : `<p class="sec-sub" style="color:var(--faint)">Nothing produced yet.</p>`}
+          </div>`).join("") : `<p style="margin:0;font-size:14px;color:var(--faint)">Nothing produced yet.</p>`}
       </section>
 
-      <section class="sources" aria-labelledby="cb-src" style="display:flex;flex-direction:column;gap:8px">
-        <div class="sec-head src-head" style="margin-bottom:8px"><h2 id="cb-src" class="sec">Sources</h2><p class="sec-sub">What this task drew on: docs, messages and sessions. Deleted sources stay listed so you can see what the work was based on.</p></div>
+      <section class="sources" aria-labelledby="cb-src">
+        <h2 id="cb-src" class="sec">Sources</h2>
         <ol>
-          ${p.sources.map(([name, kind, gone], i) => {
-            const n = String(i + 1).padStart(2, "0");
-            return gone
-              ? `<li><div class="src gone"><span class="src-n">${n}</span><span class="src-name">${esc(name)}</span><span class="gone-pill">No longer exists</span></div></li>`
-              : `<li><button type="button" class="src" data-src="${i}"><span class="src-n">${n}</span><span class="src-name">${esc(name)}</span><span class="src-kind">${esc(kind)}</span>${I.arrowSrc}</button></li>`;
-          }).join("")}
+          ${p.sources.map(([name, kind, gone], i) => gone
+            ? `<li><div class="src gone"><span class="src-name">${esc(name)}</span><span class="gone-pill">No longer exists</span></div></li>`
+            : `<li><button type="button" class="src" data-src="${i}"><span class="src-name">${esc(name)}</span><span class="src-kind">${esc(kind)}</span>${I.arrowSrc}</button></li>`
+          ).join("")}
         </ol>
       </section>`;
   }
