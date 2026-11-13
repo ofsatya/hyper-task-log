@@ -104,7 +104,7 @@
           <button type="button" role="menuitemradio" data-sort="az" aria-checked="${ui.sort === "az"}">Title A–Z ${I.check}</button>
           <hr>
           <p>Status</p>
-          ${["all", ...STATUSES].map((st) => `<button type="button" role="menuitemradio" data-status="${st}" aria-checked="${ui.status === st}">${st === "all" ? "All statuses" : st} ${I.check}</button>`).join("")}
+          ${["all", ...STATUSES].map((st) => `<button type="button" role="menuitemradio" data-status="${st}" aria-checked="${ui.status === st}">${st === "all" ? "All status" : st} ${I.check}</button>`).join("")}
           <hr>
           <p>Last activity</p>
           ${[[0, "All time"], [7, "Last 7 days"], [30, "Last 30 days"], [90, "Last 90 days"]].map(([d, l]) => `<button type="button" role="menuitemradio" data-range="${d}" aria-checked="${ui.range === d}">${l} ${I.check}</button>`).join("")}
@@ -130,7 +130,7 @@
     $("#count").textContent = narrowed ? `${list.length} of ${PROJECTS.length} tasks` : `${PROJECTS.length} tasks`;
     const chips = [];
     if (ui.ids) chips.push(`<span class="fchip">From chat: <b>${esc(ui.ids.label)}</b><button type="button" data-clear="ids" aria-label="Clear chat filter">${I.close}</button></span>`);
-    if (ui.status !== "all") chips.push(`<span class="fchip">Status: <b>${esc(ui.status)}</b><button type="button" data-clear="status" aria-label="Clear status filter">${I.close}</button></span>`);
+    if (ui.status !== "all") chips.push(`<span class="fchip"><b>${esc(ui.status)}</b><button type="button" data-clear="status" aria-label="Clear status filter">${I.close}</button></span>`);
     if (ui.range) chips.push(`<span class="fchip">Last <b>${ui.range} days</b><button type="button" data-clear="range" aria-label="Clear date filter">${I.close}</button></span>`);
     $("#fchips").innerHTML = chips.join(""); $("#fchips").hidden = !chips.length;
     const hl = (name) => {
@@ -158,7 +158,7 @@
     return [...map.values()].sort((x, y) => y.date - x.date);
   }
   const chatTitle = (e) => e.chatTitle || CH[e.chat] || "a chat";
-  const chatLink = (e) => (!e.chat ? "" : host ? `<button type="button" class="lnk" data-open-chat="${esc(e.chat)}">${esc(chatTitle(e))}</button>` : `<span>${esc(chatTitle(e))}</span>`);
+  const chatLink = (e) => (!e.chat ? "" : host && host.hasChat && !host.hasChat(e.chat) ? `<span class="gone">${esc(chatTitle(e))} (chat deleted)</span>` : host ? `<button type="button" class="lnk" data-open-chat="${esc(e.chat)}">${esc(chatTitle(e))}</button>` : `<span>${esc(chatTitle(e))}</span>`);
   const ATTN_TAG = { reply: (x) => `${x.via}`, flag: () => `Flagged by ${AI}`, waiting: (x) => `${x.via}` };
   function renderProject(p) {
     const el = $("#project");
@@ -277,6 +277,22 @@
       const p = { id, name, summary, attention: [], activity: [{ at: Date.now(), text: "Task logged from chat", chat, chatTitle }], artifacts: [], sources: chatTitle ? [[`Chat: ${chatTitle}`, "Chat"]] : [], isNew: true };
       recompute(p); PROJECTS.unshift(p); changed(null); return p;
     },
+    // Move to…: lift the latest piece of work (its email, the wait it started, its activity line) off one task and onto another.
+    takeLatest(id) {
+      const p = this.get(id); if (!p) return null;
+      const art = p.artifacts.shift() || null;
+      const wi = p.attention.map((a) => a.kind).lastIndexOf("waiting");
+      const attn = wi >= 0 ? p.attention.splice(wi, 1)[0] : null;
+      const act = p.activity.shift() || null;
+      changed(p); return { art, attn, act };
+    },
+    put(id, b) {
+      const p = this.get(id); if (!p || !b) return;
+      if (b.art) p.artifacts.unshift(b.art); if (b.attn) p.attention.push(b.attn); if (b.act) p.activity.unshift(b.act);
+      changed(p);
+    },
+    // Redo after Undo: the same task comes back with its id, so old links work again.
+    restore(p) { if (!p || this.get(p.id)) return; PROJECTS.unshift(p); recompute(p); changed(null); },
     rename(id, name) { const p = this.get(id); if (p) { p.name = name; changed(p); } },
     remove(id) { const i = PROJECTS.findIndex((p) => p.id === id); if (i >= 0) PROJECTS.splice(i, 1); if (location.hash.slice(1) === id) location.hash = ""; else route(); notifyHost(); },
   };

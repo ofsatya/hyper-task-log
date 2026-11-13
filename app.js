@@ -71,36 +71,47 @@
   const ddMenu = (key, opts, cur, down) => `<div class="menu ${down ? "down" : ""}" role="menu" hidden>${opts.map((x) => `<button type="button" role="menuitemradio" data-pick="${key}" data-val="${esc(x)}" aria-checked="${x === cur}">${esc(x)} ${CHECK}</button>`).join("")}</div>`;
   let chatQ = "";
   const tl = () => { try { return frameReady ? tasklogFrame.contentWindow.taskApi : null; } catch { return null; } };
-  const taskName = (id) => tl()?.get(id)?.name || TASKS[id] || "Task";
+  const removedNames = {};
+  const taskName = (id) => tl()?.get(id)?.name || removedNames[id] || TASKS[id] || "Task";
   const ST_COLORS = { "Needs you": "#FF8A78", Waiting: "#F2B36B", Done: "#8FCB8B" };
+  let prevCounts = null; const flashUntil = {};
   function renderSide() {
     const inSettings = view.name === "settings";
     $("#nav-home").classList.toggle("active", view.name === "home" || view.name === "chat");
     $("#nav-tasklog").classList.toggle("active", view.name === "tasklog");
     $("#nav-settings").classList.toggle("active", inSettings);
     ["home", "tasklog", "settings"].forEach((k) => $("#nav-" + k).setAttribute("aria-current", $("#nav-" + k).classList.contains("active") ? "page" : "false"));
-    $("#side-chats").hidden = inSettings; $("#side-settings").hidden = !inSettings;
+    $("#side-chats").hidden = inSettings; $("#side-settings").hidden = !inSettings; updateTitleBtn();
     const api = tl();
     // The task statuses stay in the sidebar in every view; one is highlighted only while the Task log shows it.
     $("#side-tasks").hidden = !api;
     if (api) {
       const n = api.counts(), cur = view.name === "tasklog" ? api.status() : null;
+      // A count that just changed stays highlighted for a moment, so you notice the work landed.
+      if (prevCounts) ["Needs you", "Waiting"].forEach((k) => { if (n[k] !== prevCounts[k]) { flashUntil[k] = Date.now() + 1600; setTimeout(renderSide, 1650); } });
+      prevCounts = n;
       $("#side-tasks").innerHTML = `<div class="sec-h"><span id="tasks-h">Tasks</span></div>` +
         [["Needs you", "Needs you"], ["Waiting", "Waiting"]].map(([k, l]) =>
-          `<button type="button" class="status-item${cur === k ? " active" : ""}" data-status="${k}"><span class="dot" style="background:${ST_COLORS[k] || "var(--muted)"}"></span>${l}<span class="n">${n[k] ?? 0}</span></button>`).join("");
+          `<button type="button" class="status-item${cur === k ? " active" : ""}${flashUntil[k] > Date.now() ? " flash" : ""}" data-status="${k}" style="--c:${ST_COLORS[k]}"><span class="dot" style="background:${ST_COLORS[k] || "var(--muted)"}"></span>${l}<span class="n">${n[k] ?? 0}</span></button>`).join("");
     }
     if (inSettings) {
+      $("#side-favs").hidden = true;
       $("#side-settings").innerHTML = S_GROUPS.map(([g, items]) => `<section class="sec"><div class="sec-h"><span>${g}</span></div>${items.map(([k, l]) => `<button type="button" class="set-item${view.page === k ? " active" : ""}" data-set="${k}">${sIcon(k)}${l}</button>`).join("")}</section>`).join("");
       $("#side-settings").style.cssText = "display:flex;flex-direction:column;gap:22px";
       return;
     }
     const q = chatQ.trim().toLowerCase();
     const list = state.chats.filter((c) => !q || c.title.toLowerCase().includes(q) || c.tasks.some((t) => taskName(t).toLowerCase().includes(q)));
-    $("#chat-list").innerHTML = list.length ? list.map((c) => `<div class="item${view.name === "chat" && view.id === c.id ? " active" : ""}">
-        ${renamingId === c.id ? `<div class="item-main rename"><label for="rename-input" class="sr">Rename conversation</label><input id="rename-input" type="text" value="${esc(c.title)}" autocomplete="off"></div>` : `<button class="item-main" type="button" data-chat="${c.id}" title="${esc(c.title)}"><span class="nm">${c.fav ? '<span class="fav" aria-label="Favorite">★</span> ' : ""}${esc(c.title)}</span><span class="tm">${fmt(c.time)}</span></button>`}
+    const itemHtml = (c) => `<div class="item${view.name === "chat" && view.id === c.id ? " active" : ""}">
+        ${renamingId === c.id ? `<div class="item-main rename"><label for="rename-input" class="sr">Rename conversation</label><input id="rename-input" type="text" value="${esc(c.title)}" autocomplete="off"></div>` : `<button class="item-main" type="button" data-chat="${c.id}" title="${esc(c.title)}"><span class="nm">${esc(c.title)}</span><span class="tm">${fmt(c.time)}</span></button>`}
         <button class="kebab" type="button" data-kebab="${c.id}" aria-haspopup="menu" aria-expanded="false" aria-label="Options for ${esc(c.title)}"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5.5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18.5" cy="12" r="1.6"/></svg></button>
         ${c.tasks.length ? `<button type="button" class="sub" data-chat-tasks="${c.id}" title="Show these tasks in the Task log">${TASK_IC}${c.tasks.length} ${c.tasks.length === 1 ? "task" : "tasks"}</button>` : `<span class="sub" style="margin:0 6px 4px">${TASK_IC}No tasks yet</span>`}
-      </div>`).join("") : `<div class="empty-side">No chats match “${esc(chatQ)}”.</div>`;
+      </div>`;
+    const favs = list.filter((c) => c.fav), rest = list.filter((c) => !c.fav);
+    // Favorites get their own section between Tasks and Chats.
+    $("#side-favs").hidden = !favs.length;
+    $("#fav-list").innerHTML = favs.map(itemHtml).join("");
+    $("#chat-list").innerHTML = rest.length ? rest.map(itemHtml).join("") : list.length ? "" : `<div class="empty-side">No chats match “${esc(chatQ)}”.</div>`;
   }
   const SEND_IC = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 3L10 14"/><path d="M21 3l-7 18-4-7-7-4z"/></svg>';
   function draftCard(m, i) {
@@ -111,13 +122,45 @@
     const foot = m.status === "sent"
       ? `<div class="draft-status sent">${CHECK}Sent to ${esc(d.to)} at ${esc(m.sentAt)}${m.task ? ` · saved to <button type="button" data-task="${m.task}">${esc(taskName(m.task))}</button>` : ""}</div>`
       : m.status === "discarded" ? `<div class="draft-status">Not sent. Draft discarded.</div>`
-      : `<div class="draft-actions"><button type="button" class="btn-red" data-draft="send" data-i="${i}">${SEND_IC}Send</button><button type="button" class="btn-ghost" data-draft="edit" data-i="${i}">Edit</button><button type="button" class="btn-ghost" data-draft="discard" data-i="${i}">Don't send</button></div>`;
+      : `<div class="draft-actions"><button type="button" class="btn-red" data-draft="send" data-i="${i}">${SEND_IC}Send</button><button type="button" class="btn-ghost" data-draft="edit" data-i="${i}">Edit</button></div>`;
     return `<div class="draft${m.status === "discarded" ? " discarded" : ""}"><dl><dt>To</dt><dd>${esc(d.to)}</dd><dt>Subject</dt><dd>${esc(d.subject)}</dd></dl><div class="body">${esc(d.body)}</div>${foot}</div>`;
   }
-  function createdNote(m, i) {
-    if (m.createdState === "rejected") return `<div class="created rejected">Removed from the Task log.</div>`;
-    if (m.createdState === "renaming") return `<div class="created"><label for="cr-${i}" class="sr">Task name</label><input id="cr-${i}" value="${esc(taskName(m.created))}"><button type="button" class="btn-red" data-created="save" data-i="${i}">Save</button><button type="button" class="btn-ghost" data-created="cancel" data-i="${i}">Cancel</button></div>`;
-    return `<div class="created"><span class="what">${TASK_IC}<span>Logged to the Task log as <b>${esc(taskName(m.created))}</b></span></span><button type="button" class="btn-ghost" data-task="${m.created}">Open task</button><button type="button" class="btn-ghost" data-created="rename" data-i="${i}">Rename</button><button type="button" class="btn-ghost" data-created="reject" data-i="${i}">Remove</button></div>`;
+  // ---------- logging feedback in the chat ----------
+  // m.logs: [{ kind: "new" | "upd", id, what, from, to, state: null | "renaming" | "removed" | "failed", snap, pending }]
+  const statusOfTask = (id) => tl()?.get(id)?.status || null;
+  const chip = (st, cls = "") => st ? `<span class="st-chip ${cls}" style="--c:${ST_COLORS[st]}"><span class="d"></span>${esc(st)}</span>` : "";
+  const UNDO_IC = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>';
+  const WARN_IC = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg>';
+  const lgBtn = (act, i, j, label, cls = "btn-ghost sm") => `<button type="button" class="${cls}" data-lg="${act}" data-i="${i}" data-j="${j}">${label}</button>`;
+  // A task that was logged shows as one underlined line under the work, with Undo and Delete beside it.
+  const COPY_IC = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>';
+  const SHARE_IC = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="M7.5 7.5L12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>';
+  const msgActs = (i) => `<div class="msg-acts"><button type="button" class="ma" data-ma="copy" data-i="${i}" aria-label="Copy" data-tip="Copy">${COPY_IC}</button><button type="button" class="ma" data-ma="share" data-i="${i}" aria-label="Share" data-tip="Share">${SHARE_IC}</button></div>`;
+  function logLine(L, i, j) {
+    const name = esc(L.snap?.name || taskName(L.id));
+    if (L.state === "failed") return `<div class="logged lg-line failed">${WARN_IC}<span>Sent, but not logged to the Task log.</span><span class="lg-tools">${lgBtn("retry", i, j, "Retry", "lg-t")}</span></div>`;
+    if (L.state === "removed") return `<div class="logged lg-line muted">${TASK_IC}<span>Undone. <b>${name}</b> was taken out of the Task log.</span><span class="lg-tools">${lgBtn("redo", i, j, "Redo", "lg-t")}</span></div>`;
+    if (L.state === "deleted") return `<div class="logged lg-line muted">${TASK_IC}<span>Deleted <b>${name}</b> from the Task log.</span></div>`;
+    if (L.state === "confirm") return `<div class="logged lg-line confirm">${TASK_IC}<span>Delete <b>${name}</b> from the Task log for good?</span><span class="lg-tools">${lgBtn("delyes", i, j, "Delete", "lg-t danger")}${lgBtn("delno", i, j, "Cancel", "lg-t")}</span></div>`;
+    if (L.state === "renaming") return `<div class="logged lg-line renaming">${TASK_IC}<span>Logged to the Task log as</span> <span class="lg-rename"><label for="lg-${i}-${j}" class="sr">Task name</label><input id="lg-${i}-${j}" value="${esc(taskName(L.id))}">${lgBtn("save", i, j, "Save", "btn-red sm")}${lgBtn("cancel", i, j, "Cancel", "btn-ghost sm")}</span></div>`;
+    return `<div class="logged lg-line done">${TASK_IC}<span>Logged to the Task log as <button type="button" class="lg-u" data-task="${L.id}">${esc(taskName(L.id))}</button></span><button type="button" class="lg-more" data-lgmenu="${i}-${j}" aria-haspopup="menu" aria-expanded="false" aria-label="Options for this task" data-tip="Options"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5.5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18.5" cy="12" r="1.6"/></svg></button></div>`;
+  }
+  function logsHtml(c, m, i) {
+    const L = m.logs; if (!L?.length) return "";
+    const news = L.map((x, j) => [x, j]).filter(([x]) => x.kind === "new");
+    const upds = L.map((x, j) => [x, j]).filter(([x]) => x.kind === "upd");
+    let out = news.map(([x, j]) => logLine(x, i, j)).join("");
+    out += upds.map(([x, j]) => {
+      const gone = !tl()?.get(x.id);
+      const moved = x.from && x.to && x.from !== x.to;
+      const line = `<div class="logged upd">${TASK_IC} ${x.movedFrom ? "Moved to" : "Updated"} <button type="button" data-task="${x.id}">${esc(gone ? x.name || "task" : taskName(x.id))}</button>${x.what ? `<span class="sep">·</span><span>${esc(x.what)}</span>` : ""}${moved ? `<span class="sep">·</span>${chip(x.from, "sm was")}<span class="arr">→</span>${chip(x.to, "sm")}` : ""}</div>`;
+      if (!x.unsure || gone) return line;
+      // Not sure it's the right task: say so, and offer the other tasks in this chat or a new one.
+      const others = c.tasks.filter((t) => t !== x.id && tl()?.get(t));
+      const pick = x.picking ? `<div class="mv-opts" role="group" aria-label="Move this email to">${others.map((t) => `<button type="button" class="btn-ghost sm" data-lg="moveto" data-to="${t}" data-i="${i}" data-j="${j}">${esc(taskName(t))}</button>`).join("")}<button type="button" class="btn-ghost sm" data-lg="moveto" data-to="new" data-i="${i}" data-j="${j}">+ New task</button>${lgBtn("keep", i, j, "Keep it here", "lnk")}</div>` : "";
+      return line + `<div class="unsure">I wasn't sure which task this belongs to, so I added it to the latest one. ${x.picking ? "" : lgBtn("move", i, j, "Move to…", "btn-ghost sm")}</div>${pick}`;
+    }).join("");
+    return out;
   }
   function pickerCard(m, i) {
     const pk = m.picker;
@@ -136,7 +179,7 @@
     }
     m.picker.state = "done"; m.picker.added = list;
     m.text = list.length ? `Added ${list.length === 1 ? "1 document" : list.length + " documents"} to ${m.picker.task ? "the task's sources" : "this chat"}.` : "No problem, nothing was added.";
-    if (list.length && m.picker.task) m.logged = m.picker.task;
+    if (list.length && m.picker.task) m.logs = [{ kind: "upd", id: m.picker.task, what: `added ${list.length === 1 ? "1 source" : list.length + " sources"}` }];
     renderThread(c); renderSide();
     if (list.length) toast(`Added ${list.length === 1 ? "1 source" : list.length + " sources"}`);
   }
@@ -170,7 +213,8 @@
       const ph = PLACEHOLDERS[c.tasks[0]] || [`Take care of \u201c${taskName(c.tasks[0])}\u201d.`, "On it. I've set it up and I'll track progress on the task."];
       c.msgs.unshift({ role: "user", text: ph[0], placeholder: true }, { role: "ai", text: ph[1], logged: c.tasks[0], placeholder: true });
     }
-    $("#chat-tasks").innerHTML = `<div class="chat-tasks-in"><span class="lbl sr">Tasks in this chat</span>${c.tasks.length
+    $("#chat-tasks").innerHTML = "";
+    if (false) $("#chat-tasks").innerHTML = `<div class="chat-tasks-in"><span class="lbl sr">Tasks in this chat</span>${c.tasks.length
       ? c.tasks.map((t) => `<button type="button" class="task-chip" data-task="${t}" title="Open in Task log">${TASK_IC}<span>${esc(taskName(t))}</span></button>`).join("")
       : `<span style="font-size:13px;color:var(--faint)">None yet. Tasks are logged as the work takes shape.</span>`}</div>`;
     $("#msgs-in").innerHTML = msgsHtml(c, pending);
@@ -180,7 +224,7 @@
     const last = c.msgs[c.msgs.length - 1];
     return c.msgs.map((m, i) => m.role === "user"
       ? `<div class="msg me">${esc(m.text)}</div>`
-      : `<div class="msg ai"><span class="av">${MARK}</span><div class="tx">${esc(m.text)}${m.draft ? draftCard(m, i) : ""}${m.created ? createdNote(m, i) : ""}${m.picker ? pickerCard(m, i) : ""}${m.logged ? `<div class="logged">${TASK_IC} Logged to <button type="button" data-task="${m.logged}">${esc(taskName(m.logged))}</button></div>` : ""}</div></div>`).join("")
+      : `<div class="msg ai"><span class="av">${MARK}</span><div class="tx">${esc(m.text)}${m.draft ? draftCard(m, i) : ""}${m.picker ? pickerCard(m, i) : ""}${logsHtml(c, m, i)}${(m.logs?.length || m.status === "sent") ? msgActs(i) : ""}${m.logged ? `<div class="logged">${TASK_IC} ${m.placeholder ? "Logged to" : "Linked to"} <button type="button" data-task="${m.logged}">${esc(taskName(m.logged))}</button></div>` : ""}</div></div>`).join("")
       + (pending === undefined && (!last || last.placeholder || last.text === GENERAL_FALLBACK || last.text === tl()?.fallback) ? `<div class="msg-chips">${suggestionsFor(c).map((q) => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>` : "")
       + (pending !== undefined ? `<div class="msg ai thinking" id="pending"><span class="av">${MARK}</span><div class="tx">${pending ? esc(pending) : "Thinking…"}</div></div>` : "");
   }
@@ -244,6 +288,7 @@
     ["home", "chat", "tasklog", "settings"].forEach((k) => ($("#view-" + k).hidden = view.name !== k));
     
     let where = "";
+    titleRenaming = false; titleTasksOpen = false; closeChatMenu();
     if (view.name === "chat") { const c = state.chats.find((x) => x.id === view.id); where = c ? c.title : ""; if (c) renderThread(c); }
     if (view.name === "tasklog") { where = "Task log"; ensureTasklog(); openTaskInFrame(view.task || ""); }
     else if (side.id) closeSide();
@@ -328,6 +373,7 @@
     renderThread(c, ""); renderSide();
     const api = tl();
 
+    if (wantsMulti(text)) { await new Promise((r) => setTimeout(r, 900)); doMulti(c, text); return; }
     // Actions: show the draft and ask. The task is logged or updated only when the person clicks Send.
     if (wantsDraft(text)) {
       const g = guessTask(text);
@@ -337,9 +383,11 @@
       const tp = api?.get(taskId);
       const act = /follow[- ]?up|haven'?t replied|not replied/i.test(text) ? "followup" : /\breply\b|answer/i.test(text) ? "reply" : null;
       const x = act && tp ? tp.attention.find((a) => a.kind === (act === "followup" ? "waiting" : "reply")) : null;
-      const d = x ? actionDraft(tp, x, act) : await makeDraft(tp, text);
+      // The chat already has a task but nothing in the request ties it to one: file it under the latest, and offer Move to….
+      const unsure = !x && c.tasks.length > 0 && !(g && c.tasks.includes(g));
+      const d = x ? actionDraft(tp, x, act) : await makeDraft(unsure ? null : tp, text);
       if (x) await new Promise((r) => setTimeout(r, 500));
-      c.msgs.push({ role: "ai", text: "Here's a draft. Should I send it?", draft: d, status: "pending", task: taskId || null, attn: x?.id || null, act: x ? act : null });
+      c.msgs.push({ role: "ai", text: "Here's a draft. Should I send it?", draft: d, status: "pending", task: taskId || null, attn: x?.id || null, act: x ? act : null, unsure });
       renderThread(c);
       renderSide(); return;
     }
@@ -363,8 +411,8 @@
     const out = [];
     if (m.draft) out.push(`Email ${m.status === "sent" ? "sent" : m.status === "discarded" ? "not sent" : "draft"} · To: ${m.draft.to} · Subject: ${m.draft.subject}\n${m.draft.body}`);
     if (m.picker?.added?.length) out.push("Added: " + m.picker.added.map((x) => `${x[0]} (${x[1]})`).join(", "));
-    if (m.created) out.push(`Logged to the Task log as ${taskName(m.created)}`);
-    if (m.logged) out.push(`Logged to ${taskName(m.logged)}`);
+    (m.logs || []).forEach((L) => out.push(L.state === "failed" ? "Not logged to the Task log" : L.state === "removed" ? "Removed from the Task log" : L.kind === "new" ? `Logged to the Task log as ${taskName(L.id)}` : `Updated ${taskName(L.id)}${L.what ? ": " + L.what : ""}`));
+    if (m.logged) out.push(`${m.placeholder ? "Logged to" : "Linked to"} ${taskName(m.logged)}`);
     return out;
   }
   function openTranscript(c) {
@@ -387,7 +435,7 @@
     c.msgs.push({ role: "user", text: `Added ${list.map((x) => x[0]).join(", ")}` });
     if (tg.taskId) tl()?.addSources(tg.taskId, list, { chat: c.id, chatTitle: c.title });
     const what = tg.kind === "doc" ? (list.length === 1 ? "1 document" : list.length + " documents") : (list.length === 1 ? "1 file" : list.length + " files");
-    c.msgs.push({ role: "ai", text: `Added ${what} to ${tg.taskId ? "the task's sources" : "this chat"}.`, picker: { state: "done", added: list }, logged: tg.taskId || null });
+    c.msgs.push({ role: "ai", text: `Added ${what} to ${tg.taskId ? "the task's sources" : "this chat"}.`, picker: { state: "done", added: list }, logs: tg.taskId ? [{ kind: "upd", id: tg.taskId, what: `added ${what}` }] : null });
     c.time = new Date(); renderThread(c); renderSide();
     toast(`Added ${what}`);
   });
@@ -408,7 +456,7 @@
         const lines = [`I re-ran \u201c${p.name}\u201d against the latest sources${r?.name ? ` and saved ${r.name}` : ""}.`];
         if (r?.flags.length) lines.push("", "The latest sources cover what I flagged earlier, so I've cleared it:", ...r.flags.map((f) => "• " + f));
         if (r?.removed.length) lines.push("", `I removed ${r.removed.length === 1 ? "a source that" : "sources that"} no longer ${r.removed.length === 1 ? "exists" : "exist"}:`, ...r.removed.map((f) => "• " + f));
-        c.msgs.push({ role: "ai", text: lines.join("\n"), logged: taskId });
+        c.msgs.push({ role: "ai", text: lines.join("\n"), logs: [{ kind: "upd", id: taskId, what: r?.name ? `saved ${r.name}` : "recalibrated" }] });
         renderThread(c); renderSide();
       }, 700);
       return;
@@ -431,32 +479,132 @@
       const api = tl();
       m.status = "sent"; m.text = "Here's the email I sent."; m.sentAt = new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
       // Finished work is exported: a new task if this chat had none, otherwise an update to its task.
-      if (!m.task && api) {
-        const t = api.create({ name: c.title, summary: `Sent \u201c${m.draft.subject}\u201d to ${m.draft.to}.`, chat: c.id, chatTitle: c.title });
-        m.task = t.id; c.tasks.push(t.id); m.created = t.id;
+      const before = m.task ? statusOfTask(m.task) : null;
+      const isNew = !m.task && !!api;
+      if (isNew && sim.failNext) {
+        // Simulated failure: the email went out, the record didn't.
+        sim.failNext = false; syncSimControls();
+        m.logs = [{ kind: "new", state: "failed", pending: true }];
+        renderThread(c); renderSide(); toast(`Email sent to ${m.draft.to}`); return;
       }
-      if (m.task && api) {
+      if (isNew) commitNew(c, m);
+      else if (m.task && api) {
         api.addArtifact(m.task, "email", m.draft.subject, { to: m.draft.to, subject: m.draft.subject, body: m.draft.body.split(/\n\s*\n/) });
         if (m.attn) api.resolve(m.task, m.attn);
         // Sending something means waiting on the recipient until they reply or you mark it handled.
         api.addAttention(m.task, { kind: "waiting", from: m.draft.to.replace(/\s*\((LinkedIn|Email)\)$/, ""), via: /LinkedIn/.test(m.draft.to) ? "LinkedIn" : "Email", text: m.act === "followup" ? "Followed up. No reply yet." : m.act === "reply" ? "Replied. Waiting for their response." : "Sent. No reply yet." });
         api.log(m.task, { text: m.act === "reply" ? `Replied to ${m.draft.to}` : m.act === "followup" ? `Followed up with ${m.draft.to}` : `Sent \u201c${m.draft.subject}\u201d to ${m.draft.to}`, art: m.draft.subject, chat: c.id, chatTitle: c.title });
+        const who = m.draft.to.replace(/\s*\((LinkedIn|Email)\)$/, "");
+        m.logs = [{ kind: "upd", id: m.task, name: taskName(m.task), what: m.act === "reply" ? `replied to ${who}` : m.act === "followup" ? `followed up with ${who}` : "added an email", from: before, to: statusOfTask(m.task), unsure: !!m.unsure }];
       }
-      renderThread(c); renderSide(); toast(`Email sent to ${m.draft.to}`);
+      renderThread(c); renderSide();
+      if (isNew) announce(m.logs[0].id, `Email sent · logged to Task log`); else toast(`Email sent to ${m.draft.to}`);
     }
   }
-  function createdAction(c, act, i) {
-    const m = c.msgs[i]; if (!m?.created) return;
-    if (act === "rename") { m.createdState = "renaming"; renderThread(c); $("#cr-" + i)?.select(); return; }
-    if (act === "cancel") { m.createdState = null; renderThread(c); return; }
-    if (act === "save") { const v = $("#cr-" + i).value.trim(); if (v) tl()?.rename(m.created, v); m.createdState = null; renderThread(c); renderSide(); toast("Task renamed"); return; }
-    if (act === "reject") { tl()?.remove(m.created); c.tasks = c.tasks.filter((t) => t !== m.created); m.createdState = "rejected"; renderThread(c); renderSide(); return; }
+  // The agent names the task after the work, not after the chat.
+  function taskNameFor(d) {
+    const who = d.to.replace(/\s*\((LinkedIn|Email)\)$/, "").split(",")[0].trim();
+    const s = d.subject.trim(); let x;
+    if ((x = s.match(/^Question about (.+)$/i))) return `Ask ${who} about ${x[1]}`;
+    if ((x = s.match(/^Update: (.+)$/i))) return `Update ${who} on ${x[1]}`;
+    if (/^quick question$/i.test(s)) return `Quick question for ${who}`;
+    return `Email ${who}: ${s}`;
+  }
+  // Create the task for a sent draft in a chat that had none.
+  function commitNew(c, m) {
+    const api = tl(); if (!api) return null;
+    const who = m.draft.to.replace(/\s*\((LinkedIn|Email)\)$/, "");
+    const t = api.create({ name: taskNameFor(m.draft), summary: `Sent “${m.draft.subject}” to ${m.draft.to}.`, chat: c.id, chatTitle: c.title });
+    m.task = t.id; c.tasks.push(t.id);
+    api.addArtifact(t.id, "email", m.draft.subject, { to: m.draft.to, subject: m.draft.subject, body: m.draft.body.split(/\n\s*\n/) });
+    api.addAttention(t.id, { kind: "waiting", from: who, via: /LinkedIn/.test(m.draft.to) ? "LinkedIn" : "Email", text: "Sent. No reply yet." });
+    api.log(t.id, { text: `Sent “${m.draft.subject}” to ${m.draft.to}`, art: m.draft.subject, chat: c.id, chatTitle: c.title });
+    m.logs = [{ kind: "new", id: t.id, what: `Sent “${m.draft.subject}” to ${who}. Waiting on their reply.` }];
+    simulateReply(t.id, who);
+    return t.id;
+  }
+  // Simulated: the recipient replies a little later, so the task flips to Needs you while you're elsewhere.
+  const sim = { failNext: false, timers: [] };
+  function simulateReply(id, who) {
+    sim.timers.push(setTimeout(() => {
+      const api = tl(), p = api?.get(id); if (!p) return;
+      const w = p.attention.find((a) => a.kind === "waiting"); if (!w) return;
+      api.resolve(id, w.id);
+      api.addAttention(id, { kind: "reply", from: who, via: w.via, text: "Thanks for reaching out. Could we do a quick call on Thursday instead?" });
+      api.log(id, { text: `${who} replied` });
+      refreshOpenChat(); renderSide();
+      if (isPhone()) toast(`${who} replied · ${taskName(id)} needs you`);
+    }, 12000));
+  }
+  function refreshOpenChat() { const c = view.name === "chat" ? state.chats.find((x) => x.id === view.id) : side.id ? state.chats.find((x) => x.id === side.id) : null; if (c) { const ae = document.activeElement?.id; renderThread(c); if (ae) document.getElementById(ae)?.focus(); } }
+  const isPhone = () => matchMedia("(max-width: 760px)").matches && !$("#app").classList.contains("mobile-open");
+  // On phones the sidebar is closed, so the count change isn't visible: a toast with Open says it instead.
+  function announce(id, msg) { if (isPhone() && id) toastHtml(`${esc(msg.replace(/ · .*/, ""))} · Logged to Task log <button type="button" class="lnk" data-task="${id}">Open</button>`, 4000); else toast(msg.replace(/ · .*/, "")); }
+  function syncSimControls() { const b = $("#sim-fail"); if (b) b.checked = sim.failNext; }
+
+  function logAction(c, act, i, j, to) {
+    const m = c.msgs[i], L = m?.logs?.[j]; if (!L) return;
+    const api = tl();
+    if (act === "move") { L.picking = true; renderThread(c); return; }
+    if (act === "delete") { L.state = "confirm"; renderThread(c); return; }
+    if (act === "delno") { L.state = null; renderThread(c); return; }
+    if (act === "delyes") {
+      L.snap = { name: taskName(L.id) }; removedNames[L.id] = L.snap.name; api?.remove(L.id);
+      c.tasks = c.tasks.filter((t) => t !== L.id); L.state = "deleted";
+      renderThread(c); renderSide(); toast("Deleted from the Task log"); return;
+    }
+    if (act === "keep") { L.picking = false; L.unsure = false; renderThread(c); return; }
+    if (act === "moveto" && api) {
+      const fromName = taskName(L.id), b = api.takeLatest(L.id);
+      if (to === "new") {
+        const t = api.create({ name: taskNameFor(m.draft), summary: `Sent \u201c${m.draft.subject}\u201d to ${m.draft.to}.`, chat: c.id, chatTitle: c.title });
+        api.put(t.id, b); c.tasks.push(t.id); m.task = t.id;
+        m.logs[j] = { kind: "new", id: t.id, what: `Moved from ${fromName}. Sent \u201c${m.draft.subject}\u201d and waiting on a reply.` };
+      } else {
+        api.put(to, b); m.task = to;
+        m.logs[j] = { kind: "upd", id: to, name: taskName(to), what: `moved from ${fromName}`, movedFrom: L.id };
+      }
+      renderThread(c); renderSide(); toast(`Moved to ${taskName(m.task)}`); return;
+    }
+    if (act === "rename") { L.state = "renaming"; renderThread(c); $(`#lg-${i}-${j}`)?.select(); return; }
+    if (act === "cancel") { L.state = null; renderThread(c); return; }
+    if (act === "save") { const v = $(`#lg-${i}-${j}`).value.trim(); if (v) api?.rename(L.id, v); L.state = null; renderThread(c); renderSide(); toast("Task renamed"); return; }
+    if (act === "undo") {
+      L.snap = api?.get(L.id); api?.remove(L.id);
+      removedNames[L.id] = L.snap?.name; c.tasks = c.tasks.filter((t) => t !== L.id);
+      L.state = "removed"; renderThread(c); renderSide(); toast("Removed from the Task log"); return;
+    }
+    if (act === "redo") {
+      if (L.snap) { api?.restore(L.snap); if (!c.tasks.includes(L.id)) c.tasks.push(L.id); m.task = L.id; }
+      L.state = null; renderThread(c); renderSide(); toast("Back in the Task log"); return;
+    }
+    if (act === "retry") {
+      const id = commitNew(c, m);
+      renderThread(c); renderSide(); if (id) announce(id, "Logged to Task log"); return;
+    }
+  }
+  // Demo: one request that does two separate pieces of work logs two tasks in one card.
+  const wantsMulti = (q) => /\b(book|order|reserve|schedule)\b.+\band\b.+\b(book|order|reserve|schedule|send)\b/i.test(q) && !wantsDraft(q);
+  function doMulti(c, text) {
+    const api = tl(); if (!api) return;
+    const parts = text.replace(/[.?!]+$/, "").split(/\s+and\s+(?=(?:book|order|reserve|schedule|send)\b)/i).slice(0, 3).map((x) => x.trim().replace(/^./, (ch) => ch.toUpperCase()));
+    const logs = parts.map((name) => {
+      const vendor = /offsite|venue|lunch|dinner|room/i.test(name) ? "3 venues" : /kit|swag|laptop|order/i.test(name) ? "the supplier" : "the vendor";
+      const t = api.create({ name, summary: `Asked ${vendor} for availability and pricing.`, chat: c.id, chatTitle: c.title });
+      api.addAttention(t.id, { kind: "waiting", from: vendor.replace(/^the /, "").replace(/^./, (ch) => ch.toUpperCase()), via: "Email", text: "Request sent. No reply yet." });
+      api.log(t.id, { text: `Emailed ${vendor} asking for availability and pricing`, chat: c.id, chatTitle: c.title });
+      c.tasks.push(t.id);
+      return { kind: "new", id: t.id, what: `Emailed ${vendor} for availability and pricing.` };
+    });
+    c.msgs.push({ role: "ai", text: `Done. These are separate pieces of work, so I've sent both requests and logged each as its own task. I'll track the replies there.`, logs });
+    renderThread(c); renderSide(); announce(logs[0].id, `Logged ${logs.length} tasks`);
   }
 
   // Reset demo: every task and chat goes back to how it was when the page opened, without a reload.
   function resetDemo() {
     closeSide(); closeTranscript(); $("#about").hidden = true;
     state.chats = seedChats(); chatQ = "";
+    sim.timers.forEach(clearTimeout); sim.timers = []; sim.failNext = false; syncSimControls(); prevCounts = null;
     tl()?.reset();
     hist.splice(0); hist.push({ name: "tasklog" }); pos = 0;
     go({ name: "tasklog" }, false);
@@ -475,8 +623,9 @@
       setTimeout(() => $("#side-input").focus(), 0);
     },
     runAction,
+    hasChat: (id) => state.chats.some((c) => c.id === id),
     name: NAME,
-    onTasksChanged: () => renderSide(),
+    onTasksChanged: () => { renderSide(); refreshOpenChat(); },
     // The task chat belongs to a task page: it closes on the task list or when another task opens.
     onRoute(taskId) {
       updateNav();
@@ -490,14 +639,14 @@
     input.addEventListener("input", () => { btn.disabled = !input.value.trim(); });
     form.addEventListener("submit", (e) => { e.preventDefault(); const v = input.value.trim(); if (!v) return; input.value = ""; btn.disabled = true; send(v, form.id === "side-form" ? state.chats.find((x) => x.id === side.id) : null); });
   });
-  $("#suggest").innerHTML = ["What am I working on this week?", "Any replies from customers?", "What's left on the weekly update?"].map((q) => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join("");
+  $("#suggest").innerHTML = ["Draft an email to Maya asking about the pricing page", "Book Friday's team offsite and order welcome kits for the new hires", "What am I working on this week?"].map((q) => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join("");
 
   // ---------- events ----------
   // ---------- chat item menu ----------
   let renamingId = null;
   function chatAction(act, c) {
     if (act === "tasks") { tl()?.showList({ ids: c.tasks, label: c.title }); go({ name: "tasklog" }); return; }
-    if (act === "fav") { c.fav = !c.fav; renderSide(); toast(c.fav ? "Added to Favorites" : "Removed from Favorites"); return; }
+    if (act === "fav") { c.fav = !c.fav; renderSide(); toast(c.fav ? "Added to favourites" : "Removed from favourites"); return; }
     if (act === "rename") { renamingId = c.id; renderSide(); const i = $("#rename-input"); i?.focus(); i?.select(); return; }
     if (act === "delete") {
       const i = state.chats.indexOf(c); if (i < 0) return; state.chats.splice(i, 1);
@@ -512,7 +661,58 @@
     if (c && save && v && v !== c.title) { c.title = v; if (view.name === "chat" && view.id === c.id) $("#where").textContent = v; toast("Conversation renamed"); }
     renderSide();
   }
-  function closeChatMenu() { document.querySelector(".chat-menu")?.remove(); document.querySelectorAll(".kebab[aria-expanded=true]").forEach((k) => { k.setAttribute("aria-expanded", "false"); k.closest(".item")?.classList.remove("menu-open"); }); }
+  // ---------- chat title menu (chevron in the top bar) ----------
+  let titleTasksOpen = false, titleRenaming = false;
+  const curChat = () => (view.name === "chat" ? state.chats.find((x) => x.id === view.id) : null);
+  function updateTitleBtn() {
+    const c = curChat(), b = $("#title-menu-btn"); if (b) b.hidden = !c || titleRenaming;
+    const f = $("#fav-btn"), sh = $("#share-btn"); if (!f) return;
+    f.hidden = sh.hidden = !c;
+    if (c) { const l = c.fav ? "Remove from favourites" : "Add to favourites"; f.setAttribute("aria-label", l); f.dataset.tip = l; f.setAttribute("aria-pressed", String(!!c.fav)); }
+  }
+  function titleMenuHtml(c) {
+    const IC = (d) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+    const STAR = IC('<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/>');
+    const PEN = IC('<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z"/><path d="M14.5 6.5l3 3"/>');
+    const BIN = IC('<path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l1 13h9l1-13"/><path d="M10 11v6M14 11v6"/>');
+    const tasks = c.tasks.filter((id) => tl()?.get(id));
+    return `<button type="button" role="menuitem" class="tm-tasks" data-tm="toggle" aria-expanded="${titleTasksOpen}">${TASK_IC.replace('width="14" height="14"', 'width="18" height="18"')}<span>Tasks in this chat</span><span class="tm-n">${tasks.length}</span><svg class="tm-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>`
+      + (titleTasksOpen ? `<div class="tm-list">${tasks.length ? tasks.map((id) => { const st = tl().get(id).status; return `<button type="button" role="menuitem" data-task="${id}"><span class="tm-dot" style="background:${ST_COLORS[st]}" title="${esc(st)}"></span><span class="tm-name">${esc(taskName(id))}</span></button>`; }).join("") : `<p class="tm-empty">None yet. Tasks are logged as the work gets done.</p>`}</div>` : "")
+      + `<div class="tm-sep" role="separator"></div>`
+      + `<button type="button" role="menuitem" data-tm="rename">${PEN}Rename</button>`
+      + `<button type="button" role="menuitem" class="danger" data-tm="delete">${BIN}Delete</button>`;
+  }
+  function openTitleMenu(keepFocus) {
+    const c = curChat(), btn = $("#title-menu-btn"); if (!c) return;
+    let m = document.querySelector(".chat-menu.title-menu");
+    if (!m) { closeChatMenu(); m = document.createElement("div"); m.className = "chat-menu title-menu"; m.setAttribute("role", "menu"); document.body.appendChild(m); }
+    m.innerHTML = titleMenuHtml(c);
+    const r = btn.getBoundingClientRect();
+    m.style.left = Math.max(8, Math.min(r.left, innerWidth - m.offsetWidth - 8)) + "px";
+    m.style.top = r.bottom + 8 + "px";
+    btn.setAttribute("aria-expanded", "true");
+    if (!keepFocus) m.querySelector("button")?.focus(); else m.querySelector(keepFocus)?.focus();
+  }
+  function titleAction(act) {
+    const c = curChat(); if (!c) return;
+    if (act === "toggle") { titleTasksOpen = !titleTasksOpen; openTitleMenu(".tm-tasks"); return; }
+    closeChatMenu();
+    if (act === "fav") { chatAction("fav", c); return; }
+    if (act === "delete") { chatAction("delete", c); return; }
+    if (act === "rename") {
+      titleRenaming = true; updateTitleBtn();
+      $("#where").innerHTML = `<label for="title-input" class="sr">Rename conversation</label><input id="title-input" type="text" value="${esc(c.title)}" autocomplete="off">`;
+      const i = $("#title-input"); i.focus(); i.select();
+    }
+  }
+  function finishTitleRename(save) {
+    if (!titleRenaming) return;
+    const c = curChat(), v = $("#title-input")?.value.trim();
+    titleRenaming = false;
+    if (c && save && v && v !== c.title) { c.title = v; toast("Conversation renamed"); }
+    $("#where").textContent = c ? c.title : ""; updateTitleBtn(); renderSide();
+  }
+  function closeChatMenu() { document.querySelector(".chat-menu")?.remove(); $("#title-menu-btn")?.setAttribute("aria-expanded", "false"); document.querySelectorAll("[data-lgmenu][aria-expanded=true]").forEach((b) => b.setAttribute("aria-expanded", "false")); document.querySelectorAll(".kebab[aria-expanded=true]").forEach((k) => { k.setAttribute("aria-expanded", "false"); k.closest(".item")?.classList.remove("menu-open"); }); }
   function openChatMenu(btn) {
     const c = state.chats.find((x) => x.id === btn.dataset.kebab); if (!c) return;
     const IC = (d) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -520,9 +720,8 @@
     const PEN = IC('<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z"/><path d="M14.5 6.5l3 3"/>');
     const BIN = IC('<path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l1 13h9l1-13"/><path d="M10 11v6M14 11v6"/>');
     const m = document.createElement("div"); m.className = "chat-menu"; m.setAttribute("role", "menu");
-    m.innerHTML = `<div class="cm-h">Conversation</div>`
-      + (c.tasks.length ? `<button type="button" role="menuitem" data-cm="tasks" data-id="${c.id}">${TASK_IC}Show ${c.tasks.length === 1 ? "1 task" : c.tasks.length + " tasks"} in Task log</button>` : "")
-      + `<button type="button" role="menuitem" data-cm="fav" data-id="${c.id}">${STAR}${c.fav ? "Remove from Favorites" : "Add to Favorites"}</button>`
+    m.innerHTML = (c.tasks.length ? `<button type="button" role="menuitem" data-cm="tasks" data-id="${c.id}">${TASK_IC}Show ${c.tasks.length === 1 ? "1 task" : c.tasks.length + " tasks"} in Task log</button>` : "")
+      + `<button type="button" role="menuitem" data-cm="fav" data-id="${c.id}">${STAR}${c.fav ? "Remove from favourites" : "Add to favourites"}</button>`
       + `<button type="button" role="menuitem" data-cm="rename" data-id="${c.id}">${PEN}Rename</button>`
       + `<button type="button" role="menuitem" class="danger" data-cm="delete" data-id="${c.id}">${BIN}Delete</button>`;
     document.body.appendChild(m);
@@ -534,22 +733,29 @@
   }
   let toastT;
   const toast = (m) => { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2000); };
+  const toastHtml = (h, ms) => { const t = $("#toast"); t.innerHTML = h; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), ms); };
   const closeMenus = (except) => document.querySelectorAll(".dd .menu").forEach((m) => { if (m !== except) { m.hidden = true; m.previousElementSibling?.setAttribute("aria-expanded", "false"); } });
   document.addEventListener("click", (e) => {
     const t = e.target;
     // Scoped prototype: the Task log, chats and tracing links work; Home, Settings, search and new chat say they aren't part of the demo.
     if (t.closest("#nav-home")) { go({ name: "home" }); return; }
-    if (t.closest("#nav-settings, #chat-search-btn, #new-chat")) { toast("Not part of this demo."); return; }
+    if (t.closest("#new-chat")) { go({ name: "home" }); setTimeout(() => $("#home-input")?.focus(), 0); return; }
+    if (t.closest("#nav-settings, #chat-search-btn")) { toast("Not part of this demo."); return; }
     if (t.closest("#nav-back")) { navBack(); return; }
     if (t.closest("#nav-fwd")) { navFwd(); return; }
     if (t.closest("#nav-tasklog")) { tl()?.showList(); go({ name: "tasklog" }); return; }
     const sf = t.closest("[data-status]"); if (sf) { tl()?.showList({ status: sf.dataset.status }); go({ name: "tasklog" }); return; }
+    if (t.closest("#fav-btn")) { const c = curChat(); if (c) chatAction("fav", c); return; }
+    if (t.closest("#share-btn")) { toast("Sharing isn't part of this demo"); return; }
+    if (t.closest("#title-menu-btn")) { const open = !!document.querySelector(".title-menu"); closeChatMenu(); if (!open) openTitleMenu(); return; }
+    const tmB = t.closest("[data-tm]"); if (tmB) { titleAction(tmB.dataset.tm); return; }
+    if (t.closest(".title-menu [data-task]")) closeChatMenu();
     const cm = t.closest("[data-cm]"); if (cm) { const c = state.chats.find((x) => x.id === cm.dataset.id); closeChatMenu(); if (c) chatAction(cm.dataset.cm, c); return; }
     const kb = t.closest("[data-kebab]"); if (kb) { const was = kb.getAttribute("aria-expanded") === "true"; closeChatMenu(); if (!was) openChatMenu(kb); return; }
     if (!t.closest(".chat-menu")) closeChatMenu();
     const ct = t.closest("[data-chat-tasks]"); if (ct) { const c = state.chats.find((x) => x.id === ct.dataset.chatTasks); if (c) { tl()?.showList({ ids: c.tasks, label: c.title }); go({ name: "tasklog" }); } return; }
     const chB = t.closest("[data-chat]"); if (chB) { go({ name: "chat", id: chB.dataset.chat }); return; }
-    const tkB = t.closest("[data-task]"); if (tkB) { go({ name: "tasklog", task: tkB.dataset.task }); return; }
+    const tkB = t.closest("[data-task]"); if (tkB) { if (!tl()?.get(tkB.dataset.task)) { toast("This task was removed from the Task log"); return; } $("#toast").classList.remove("show"); go({ name: "tasklog", task: tkB.dataset.task }); return; }
     if (t.closest("#side-close")) { closeSide(); renderSide(); return; }
     if (t.closest("[data-tr-close]")) { closeTranscript(); return; }
     if (t.closest("#tr-copy")) {
@@ -565,9 +771,32 @@
     if (t.closest("#side-transcript")) { const c = state.chats.find((x) => x.id === side.id); if (c) openTranscript(c); return; }
     if (t.closest("#side-full")) { const id = side.id; closeSide(); go({ name: "chat", id }); return; }
     const cur = view.name === "chat" ? state.chats.find((x) => x.id === view.id) : sideOpen() ? state.chats.find((x) => x.id === side.id) : null;
-    const qB = t.closest("[data-q]"); if (qB && cur) { send(qB.dataset.q, cur); return; }
+    const qB = t.closest("[data-q]"); if (qB && (cur || view.name === "home")) { send(qB.dataset.q, cur); return; }
     const daB = t.closest("[data-draft]"); if (daB && cur) { draftAction(cur, daB.dataset.draft, +daB.dataset.i); return; }
-    const crB = t.closest("[data-created]"); if (crB && cur) { createdAction(cur, crB.dataset.created, +crB.dataset.i); return; }
+    const lmB = t.closest("[data-lgmenu]");
+    if (lmB) {
+      const was = lmB.getAttribute("aria-expanded") === "true"; closeChatMenu(); if (was) return;
+      const [i, j] = lmB.dataset.lgmenu.split("-");
+      const IC = (d) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+      const m = document.createElement("div"); m.className = "chat-menu log-menu"; m.setAttribute("role", "menu");
+      m.innerHTML = `<button type="button" role="menuitem" data-lg="undo" data-i="${i}" data-j="${j}">${IC('<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>')}Undo</button>`
+        + `<button type="button" role="menuitem" data-lg="rename" data-i="${i}" data-j="${j}">${IC('<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z"/><path d="M14.5 6.5l3 3"/>')}Rename</button>`
+        + `<button type="button" role="menuitem" class="danger" data-lg="delete" data-i="${i}" data-j="${j}">${IC('<path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l1 13h9l1-13"/><path d="M10 11v6M14 11v6"/>')}Delete</button>`;
+      document.body.appendChild(m);
+      const r = lmB.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
+      m.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + "px";
+      m.style.top = (r.bottom + 6 + h > innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6) + "px";
+      lmB.setAttribute("aria-expanded", "true"); m.querySelector("button")?.focus();
+      return;
+    }
+    const maB = t.closest("[data-ma]");
+    if (maB && cur) {
+      if (maB.dataset.ma === "share") { toast("Sharing isn't part of this demo"); return; }
+      const m = cur.msgs[+maB.dataset.i], txt = [m?.text, ...(m ? extraOf(m) : [])].filter(Boolean).join("\n\n");
+      navigator.clipboard?.writeText(txt).then(() => toast("Copied"), () => toast("Couldn't copy. Select the text instead.")) ?? toast("Couldn't copy. Select the text instead.");
+      return;
+    }
+    const lgB = t.closest("[data-lg]"); if (lgB && cur) { if (lgB.closest(".log-menu")) closeChatMenu(); logAction(cur, lgB.dataset.lg, +lgB.dataset.i, +lgB.dataset.j, lgB.dataset.to); return; }
     const pkB = t.closest("[data-picker]"); if (pkB && cur) { pickerAction(cur, pkB.dataset.picker, +pkB.dataset.i); return; }
     const atB = t.closest("[data-attach]");
     if (atB && cur && (atB.closest("#side-chat") || atB.closest("#view-chat"))) {
@@ -588,8 +817,14 @@
     if (e.target.id === "chat-q") { chatQ = e.target.value; renderSide(); }
     if (e.target.id === "ci") { state.prefs.instructions = e.target.value; $("#ci-count").textContent = `${e.target.value.length}/2000`; savePrefs(); }
   });
+  document.addEventListener("keydown", (e) => {
+    const lm = e.target.id?.match(/^lg-(\d+)-(\d+)$/); const cur = view.name === "chat" ? state.chats.find((x) => x.id === view.id) : null;
+    if (lm && cur && (e.key === "Enter" || e.key === "Escape")) { e.preventDefault(); e.stopPropagation(); logAction(cur, e.key === "Enter" ? "save" : "cancel", +lm[1], +lm[2]); }
+  });
+  document.addEventListener("change", (e) => { if (e.target.id === "sim-fail") sim.failNext = e.target.checked; });
   document.addEventListener("keydown", (e) => { if (e.target.id === "rename-input") { if (e.key === "Enter") { e.preventDefault(); finishRename(true); } else if (e.key === "Escape") { e.stopPropagation(); finishRename(false); } return; } });
-  document.addEventListener("focusout", (e) => { if (e.target.id === "rename-input" && renamingId) finishRename(true); });
+  document.addEventListener("focusout", (e) => { if (e.target.id === "rename-input" && renamingId) finishRename(true); if (e.target.id === "title-input") finishTitleRename(true); });
+  document.addEventListener("keydown", (e) => { if (e.target.id === "title-input" && (e.key === "Enter" || e.key === "Escape")) { e.preventDefault(); e.stopPropagation(); finishTitleRename(e.key === "Enter"); } }, true);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeChatMenu(); closeMenus(); closeTranscript(); $("#about").hidden = true; } });
 
   render();
